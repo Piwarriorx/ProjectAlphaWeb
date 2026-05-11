@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { approveUser, rejectUser } from './actions'
 import { uploadFile, listFiles, deleteFile, getSignedDownloadUrl } from './file-actions'
 import { saveUserConfig, getUserConfig } from './config-actions'
+import { updateUserGroup, getUsersWithGroups, getAvailableGroups, updateUserRole } from './group-actions'
 
 interface User {
   id: number
@@ -12,6 +13,7 @@ interface User {
   role: string
   created_at: string
   last_login_at?: string | null
+  group_id?: string | null
 }
 
 interface FileRecord {
@@ -39,12 +41,17 @@ export default function DashboardPage() {
   const [files, setFiles] = useState<FileRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [time, setTime] = useState('')
-  const [activeTab, setActiveTab] = useState<'users' | 'files' | 'config'>('files')
+  const [activeTab, setActiveTab] = useState<'users' | 'files' | 'config' | 'management'>('files')
   const [uploadMessage, setUploadMessage] = useState('')
   const [uploading, setUploading] = useState(false)
   const [configText, setConfigText] = useState('')
   const [configMessage, setConfigMessage] = useState('')
   const [savingConfig, setSavingConfig] = useState(false)
+  const [managementMessage, setManagementMessage] = useState('')
+  const [updatingGroup, setUpdatingGroup] = useState<number | null>(null)
+  
+  // Predefined groups
+  const predefinedGroups = ['not set', '1', '2', '3', '4', '5']
   const supabase = createClient()
 
   useEffect(() => {
@@ -69,6 +76,10 @@ export default function DashboardPage() {
     }
 
     const userData = JSON.parse(session)
+    console.log('User data from localStorage:', userData)
+    console.log('User ID type:', typeof userData?.id)
+    console.log('User ID value:', userData?.id)
+    
     setUser(userData)
 
     // Set default tab based on user role
@@ -80,15 +91,28 @@ export default function DashboardPage() {
 
     fetchUsers()
     fetchFiles()
-    if (userData) {
-      fetchUserConfig(userData.id)
+    
+    // Try different possible ID field names like in handleSaveConfig
+    let userId = userData.id || userData.user_id || userData.userId
+    console.log('Extracted userId in useEffect:', userId, 'Type:', typeof userId)
+    
+    // Convert to number if it's a string
+    if (typeof userId === 'string') {
+      userId = parseInt(userId, 10)
+    }
+    
+    if (userId && !isNaN(userId) && userId !== 0) {
+      console.log('Calling fetchUserConfig with userId:', userId)
+      fetchUserConfig(userId)
+    } else {
+      console.error('User data or ID is missing/invalid:', userData, 'Extracted ID:', userId)
     }
   }, [])
 
   async function fetchUsers() {
     const { data, error } = await supabase
       .from('users')
-      .select('id, username, role, created_at, last_login_at')
+      .select('id, username, role, created_at, last_login_at, group_id')
       .order('created_at', { ascending: false })
 
     setUsers(data || [])
@@ -101,8 +125,23 @@ export default function DashboardPage() {
   }
 
   async function fetchUserConfig(userId: number) {
+    console.log('fetchUserConfig called with userId:', userId, 'Type:', typeof userId)
+    
+    if (!userId || userId === null || userId === undefined) {
+      console.error('Invalid userId in fetchUserConfig:', userId)
+      return
+    }
+    
+    console.log('Fetching config for user ID:', userId)
     const { configText, error } = await getUserConfig(userId)
-    if (!error) setConfigText(configText)
+    console.log('getUserConfig result:', { configText, error })
+    
+    if (!error) {
+      console.log('Setting configText state to:', configText)
+      setConfigText(configText)
+    } else {
+      console.error('Error fetching user config:', error)
+    }
   }
 
   async function handleApprove(id: number) {
@@ -158,17 +197,87 @@ export default function DashboardPage() {
   }
 
   async function handleSaveConfig() {
-    if (!user) return
+    console.log('handleSaveConfig called, user object:', user)
+    
+    // Get user data directly from localStorage to bypass any state issues
+    const session = localStorage.getItem('ezcrosshair_user')
+    if (!session) {
+      setConfigMessage('No session found. Please log in again.')
+      return
+    }
+
+    let userData
+    try {
+      userData = JSON.parse(session)
+      console.log('Raw user data from localStorage:', userData)
+    } catch (e) {
+      console.error('Failed to parse user data:', e)
+      setConfigMessage('Invalid session data. Please log in again.')
+      return
+    }
+    
+    // Try different possible ID field names
+    let userId = userData.id || userData.user_id || userData.userId
+    console.log('Extracted userId:', userId, 'Type:', typeof userId)
+    
+    // Convert to number if it's a string
+    if (typeof userId === 'string') {
+      userId = parseInt(userId, 10)
+    }
+    
+    if (!userId || isNaN(userId) || userId === 0) {
+      console.error('Invalid userId after extraction:', userId)
+      setConfigMessage(`Invalid user ID: ${userId}. Please log in again.`)
+      return
+    }
+    
     setSavingConfig(true)
     setConfigMessage('')
+    console.log('Attempting to save config with userId:', userId)
     
-    const result = await saveUserConfig(user.id, configText)
+    const result = await saveUserConfig(userId, configText)
     if (result.error) {
       setConfigMessage(result.error)
     } else {
       setConfigMessage('Configuration saved successfully!')
     }
     setSavingConfig(false)
+  }
+
+  async function handleUpdateGroup(userId: number, newGroupId: string) {
+    setUpdatingGroup(userId)
+    setManagementMessage('')
+    
+    const result = await updateUserGroup(userId, newGroupId === 'not set' ? null : newGroupId)
+    if (result.error) {
+      setManagementMessage(result.error)
+    } else {
+      setManagementMessage('User group updated successfully!')
+      fetchUsers()
+    }
+    
+    setUpdatingGroup(null)
+    
+    // Clear message after 3 seconds
+    setTimeout(() => setManagementMessage(''), 3000)
+  }
+
+  async function handleUpdateRole(userId: number, newRole: string) {
+    setUpdatingGroup(userId)
+    setManagementMessage('')
+    
+    const result = await updateUserRole(userId, newRole)
+    if (result.error) {
+      setManagementMessage(result.error)
+    } else {
+      setManagementMessage('User role updated successfully!')
+      fetchUsers()
+    }
+    
+    setUpdatingGroup(null)
+    
+    // Clear message after 3 seconds
+    setTimeout(() => setManagementMessage(''), 3000)
   }
 
   function logout() {
@@ -292,6 +401,22 @@ export default function DashboardPage() {
               }}
             >
               Config
+            </button>
+            <button
+              onClick={() => setActiveTab('management')}
+              style={{
+                padding: '10px 24px',
+                borderRadius: '10px',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 600,
+                transition: 'all 0.2s ease',
+                background: activeTab === 'management' ? 'rgba(255, 149, 0, 0.15)' : 'transparent',
+                color: activeTab === 'management' ? '#ff9500' : '#5a6072',
+              }}
+            >
+              Management
             </button>
           </div>
         )}
@@ -752,6 +877,146 @@ export default function DashboardPage() {
                 >
                   {savingConfig ? 'Saving...' : 'Save Configuration'}
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Admin - Management Tab */}
+        {user.role === 'admin' && activeTab === 'management' && (
+          <div>
+            <div style={{
+              background: 'rgba(20, 22, 35, 0.7)',
+              border: '1px solid rgba(255, 149, 0, 0.2)',
+              borderRadius: '16px',
+              padding: '32px',
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '24px'
+              }}>
+                <h2 style={{ color: '#ff9500', fontSize: '24px', margin: 0 }}>
+                  User Group Management
+                </h2>
+                {managementMessage && (
+                  <div style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    background: managementMessage.includes('success') ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255, 68, 68, 0.1)',
+                    color: managementMessage.includes('success') ? '#00ff88' : '#ff4444',
+                    border: `1px solid ${managementMessage.includes('success') ? 'rgba(0, 255, 136, 0.3)' : 'rgba(255, 68, 68, 0.3)'}`,
+                  }}>
+                    {managementMessage}
+                  </div>
+                )}
+              </div>
+
+              <div style={{
+                background: 'rgba(20, 22, 35, 0.5)',
+                borderRadius: '12px',
+                overflow: 'hidden',
+                marginBottom: '24px'
+              }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 120px 150px',
+                  padding: '16px 24px',
+                  background: 'rgba(0, 0, 0, 0.3)',
+                  borderBottom: '1px solid rgba(255,255,255,0.05)',
+                  color: '#8b92a8',
+                  fontSize: '12px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                  fontWeight: 600,
+                }}>
+                  <div>Username</div>
+                  <div>Role</div>
+                  <div>Current Group</div>
+                </div>
+
+                {users
+                  .filter(u => u.role !== 'pending')
+                  .sort((a, b) => {
+                    // Admin roles first
+                    if (a.role === 'admin' && b.role !== 'admin') return -1
+                    if (a.role !== 'admin' && b.role === 'admin') return 1
+                    return 0
+                  })
+                  .map(u => (
+                  <div key={u.id} style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 120px 150px',
+                    padding: '16px 24px',
+                    borderBottom: '1px solid rgba(255,255,255,0.05)',
+                    alignItems: 'center',
+                  }}>
+                    <div style={{ color: '#fff', fontWeight: 600 }}>
+                      {u.username}
+                    </div>
+                    <div>
+                      {u.role === 'admin' ? (
+                        <span style={{
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          textTransform: 'uppercase',
+                          fontWeight: 600,
+                          background: 'rgba(255, 149, 0, 0.15)',
+                          color: '#ff9500',
+                        }}>
+                          {u.role}
+                        </span>
+                      ) : (
+                        <select
+                          value={u.role}
+                          onChange={(e) => handleUpdateRole(u.id, e.target.value)}
+                          disabled={updatingGroup === u.id}
+                          style={{
+                            padding: '4px 10px',
+                            background: 'rgba(10, 12, 21, 0.8)',
+                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                            borderRadius: '6px',
+                            color: '#fff',
+                            fontSize: '11px',
+                            cursor: updatingGroup === u.id ? 'not-allowed' : 'pointer',
+                            opacity: updatingGroup === u.id ? 0.6 : 1,
+                            textTransform: 'uppercase',
+                            fontWeight: 600,
+                          }}
+                        >
+                          <option value="user">user</option>
+                          <option value="admin">admin</option>
+                          <option value="pending">pending</option>
+                        </select>
+                      )}
+                    </div>
+                    <div>
+                      <select
+                        value={u.group_id || 'not set'}
+                        onChange={(e) => handleUpdateGroup(u.id, e.target.value)}
+                        disabled={updatingGroup === u.id}
+                        style={{
+                          padding: '6px 10px',
+                          background: 'rgba(10, 12, 21, 0.8)',
+                          border: '1px solid rgba(255, 255, 255, 0.2)',
+                          borderRadius: '6px',
+                          color: '#fff',
+                          fontSize: '12px',
+                          cursor: updatingGroup === u.id ? 'not-allowed' : 'pointer',
+                          opacity: updatingGroup === u.id ? 0.6 : 1,
+                        }}
+                      >
+                        {predefinedGroups.map(group => (
+                          <option key={group} value={group}>{group}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>

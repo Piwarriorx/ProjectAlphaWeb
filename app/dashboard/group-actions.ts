@@ -5,13 +5,15 @@ import { createServerSupabase } from '@/lib/supabase/server'
 export async function updateUserGroup(userId: number, groupId: string | null) {
   const supabase = await createServerSupabase()
 
-  const { error } = await supabase
-    .from('users')
-    .update({ group_id: groupId })
-    .eq('id', userId)
+  console.log('Updating user group:', { userId, groupId })
+
+  const { data, error } = await supabase
+    .rpc('update_user_group', { p_user_id: userId, p_group_id: groupId })
+
+  console.log('Update result:', { data, error })
 
   if (error) return { error: error.message }
-  return { success: true }
+  return { success: true, data }
 }
 
 export async function getUsersWithGroups() {
@@ -26,6 +28,18 @@ export async function getUsersWithGroups() {
   return { users: data || [], error: null }
 }
 
+export async function updateUserRole(userId: number, role: string) {
+  const supabase = await createServerSupabase()
+
+  const { data, error } = await supabase
+    .rpc('update_user_role', { p_user_id: userId, p_role: role })
+
+  console.log('Role update result:', { data, error })
+
+  if (error) return { error: error.message }
+  return { success: true, data }
+}
+
 export async function getAvailableGroups() {
   const supabase = await createServerSupabase()
 
@@ -35,7 +49,7 @@ export async function getAvailableGroups() {
     .not('group_id', 'is', null)
 
   if (error) return { groups: [], error: error.message }
-  
+
   // Extract unique group IDs
   const uniqueGroups = [...new Set(data?.map(u => u.group_id).filter(Boolean))]
   return { groups: uniqueGroups, error: null }
