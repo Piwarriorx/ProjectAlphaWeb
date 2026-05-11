@@ -1707,109 +1707,126 @@ useEffect(() => {
         )}
 
         {/* Admin - Group Tab */}
-{user.role === 'admin' && activeTab === 'group' && (
-  <div>
-    <div style={{
-      background: 'rgba(20, 22, 35, 0.7)',
-      border: '1px solid rgba(255, 149, 0, 0.2)',
-      borderRadius: '16px',
-      padding: '32px',
-    }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <div>
-          <h2 style={{ color: '#ff9500', fontSize: '24px', margin: 0 }}>Group Expirations</h2>
-          <p style={{ color: '#5a6072', fontSize: '13px', margin: '6px 0 0' }}>
-            Select a group and set expiration by hours, minutes, and seconds.
-          </p>
-        </div>
-        <div style={{
-          padding: '8px 16px',
-          borderRadius: '8px',
-          fontSize: '14px',
-          fontWeight: 500,
-          background: 'rgba(0, 255, 136, 0.1)',
-          color: '#00ff88',
-          border: '1px solid rgba(0, 255, 136, 0.3)',
-        }}>
-          {sortedGroupExpirations.length} group(s)
-        </div>
-      </div>
+        {user.role === 'admin' && activeTab === 'group' && (
+          <div>
+            <div style={{
+              background: 'rgba(20, 22, 35, 0.7)',
+              border: '1px solid rgba(255, 149, 0, 0.2)',
+              borderRadius: '16px',
+              padding: '32px',
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '24px'
+              }}>
+                <div>
+                  <h2 style={{ color: '#ff9500', fontSize: '24px', margin: 0 }}>
+                    Group Expirations
+                  </h2>
+                  <p style={{ color: '#5a6072', fontSize: '13px', margin: '6px 0 0' }}>
+                    View each group's server time, expiration time, and remaining time.
+                  </p>
+                </div>
+                <div style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  background: 'rgba(0, 255, 136, 0.1)',
+                  color: '#00ff88',
+                  border: '1px solid rgba(0, 255, 136, 0.3)',
+                }}>
+                  {sortedGroupExpirations.length} group(s)
+                </div>
+              </div>
 
-      {/* Group expiration editor */}
-      <div style={{ marginBottom: '32px', padding: '24px', background: 'rgba(20,22,35,0.7)', borderRadius: '12px' }}>
-        <h3 style={{ color: '#00ff88', marginBottom: '12px' }}>Update Group Expiration</h3>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <select
-            value={selectedGroupId}
-            onChange={e => setSelectedGroupId(e.target.value)}
-            style={{ padding: '6px 10px', borderRadius: '6px', background: 'rgba(10,12,21,0.8)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)' }}
-          >
-            <option value="">Select Group</option>
-            {sortedGroupExpirations.map(g => (
-              <option key={g.group_id} value={g.group_id}>{g.group_id}</option>
-            ))}
-          </select>
+              <div style={{
+                background: 'rgba(20, 22, 35, 0.5)',
+                borderRadius: '12px',
+                overflow: 'hidden',
+              }}>
+                {/* Header */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1.2fr 1.2fr 1fr 2fr', // Added last column for users
+                  padding: '16px 24px',
+                  background: 'rgba(0, 0, 0, 0.3)',
+                  borderBottom: '1px solid rgba(255,255,255,0.05)',
+                  color: '#8b92a8',
+                  fontSize: '12px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                  fontWeight: 600,
+                }}>
+                  <div>Group ID</div>
+                  <div>Server Time</div>
+                  <div>Expire Time</div>
+                  <div>Remaining</div>
+                  <div>Users</div>
+                </div>
 
-          <input type="number" min={0} placeholder="Hours" value={hours} onChange={e => setHours(Number(e.target.value))}
-            style={{ width: '60px', padding: '4px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.2)' }} />
-          <input type="number" min={0} placeholder="Minutes" value={minutes} onChange={e => setMinutes(Number(e.target.value))}
-            style={{ width: '60px', padding: '4px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.2)' }} />
-          <input type="number" min={0} placeholder="Seconds" value={seconds} onChange={e => setSeconds(Number(e.target.value))}
-            style={{ width: '60px', padding: '4px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.2)' }} />
+                {sortedGroupExpirations.length === 0 && (
+                  <div style={{
+                    padding: '28px 24px',
+                    color: '#5a6072',
+                    textAlign: 'center',
+                    fontSize: '14px',
+                  }}>
+                    No group expirations configured yet.
+                  </div>
+                )}
 
-          <button
-            onClick={async () => {
-              if (!selectedGroupId) return alert('Select a group first!')
-              const now = new Date()
-              const expireTime = new Date(now.getTime() + hours*3600000 + minutes*60000 + seconds*1000)
-              const result = await updateGroupExpiration(selectedGroupId, now.toISOString(), expireTime.toISOString())
-              if (result.error) alert('Error: ' + result.error)
-              else {
-                alert('Group expiration updated!')
-                fetchGroupExpirations()
-                setHours(0); setMinutes(0); setSeconds(0)
-              }
-            }}
-            style={{ padding: '6px 14px', background: '#00ff88', color: '#0a0c15', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
-          >
-            Save
-          </button>
-        </div>
-      </div>
-
-      {/* Group table */}
-      <div style={{ background: 'rgba(20,22,35,0.5)', borderRadius: '12px', overflow: 'hidden' }}>
-        {/* Table header */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 1.2fr 1fr 2fr', padding: '16px 24px', background: 'rgba(0,0,0,0.3)', borderBottom: '1px solid rgba(255,255,255,0.05)', color: '#8b92a8', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px', fontWeight: 600 }}>
-          <div>Group ID</div>
-          <div>Server Time</div>
-          <div>Expire Time</div>
-          <div>Remaining</div>
-          <div>Users</div>
-        </div>
-
-        {sortedGroupExpirations.map(group => (
-          <div key={group.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 1.2fr 1fr 2fr', padding: '16px 24px', borderBottom: '1px solid rgba(255,255,255,0.05)', alignItems: 'center' }}>
-            <div style={{ color: '#fff', fontWeight: 600 }}>{group.group_id}</div>
-            <div style={{ color: '#8b92a8', fontSize: '13px' }}>{formatDateTime(group.servertime)}</div>
-            <div style={{ color: '#8b92a8', fontSize: '13px' }}>{formatDateTime(group.expiretime)}</div>
-            <div>
-              <span style={{ display: 'inline-flex', padding: '4px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', background: new Date(group.expiretime).getTime() <= Date.now() ? 'rgba(255,68,68,0.12)' : 'rgba(0,255,136,0.12)', color: new Date(group.expiretime).getTime() <= Date.now() ? '#ff4444' : '#00ff88' }}>
-                {formatRemainingTime(group.expiretime)}
-              </span>
-            </div>
-            <div style={{ color: '#fff', fontSize: '12px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-              {users.filter(u => String(u.group_id || 'not set') === group.group_id).map(u => (
-                <span key={u.id} style={{ background: 'rgba(10,12,21,0.5)', padding: '2px 6px', borderRadius: '6px' }}>{u.username}</span>
-              ))}
+                {sortedGroupExpirations.map(group => (
+                  <div key={group.id} style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1.2fr 1.2fr 1fr 2fr',
+                    padding: '16px 24px',
+                    borderBottom: '1px solid rgba(255,255,255,0.05)',
+                    alignItems: 'center',
+                  }}>
+                    <div style={{ color: '#fff', fontWeight: 600 }}>{group.group_id}</div>
+                    <div style={{ color: '#8b92a8', fontSize: '13px' }}>{formatDateTime(group.servertime)}</div>
+                    <div style={{ color: '#8b92a8', fontSize: '13px' }}>{formatDateTime(group.expiretime)}</div>
+                    <div>
+                      <span style={{
+                        display: 'inline-flex',
+                        padding: '4px 10px',
+                        borderRadius: '999px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        background: new Date(group.expiretime).getTime() <= Date.now()
+                          ? 'rgba(255, 68, 68, 0.12)'
+                          : 'rgba(0, 255, 136, 0.12)',
+                        color: new Date(group.expiretime).getTime() <= Date.now()
+                          ? '#ff4444'
+                          : '#00ff88',
+                      }}>
+                        {formatRemainingTime(group.expiretime)}
+                      </span>
+                    </div>
+                    <div style={{ color: '#fff', fontSize: '12px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {users
+                        .filter(u => String(u.group_id || 'not set') === group.group_id)
+                        .map(u => (
+                          <span key={u.id} style={{
+                            background: 'rgba(10,12,21,0.5)',
+                            padding: '2px 6px',
+                            borderRadius: '6px',
+                          }}>
+                            {u.username}
+                          </span>
+                        ))
+                      }
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        ))}
-      </div>
-    </div>
-  </div>
-)}
+        )}
         {/* Regular User - Tabs */}
         {user.role === 'user' && (
           <div>
