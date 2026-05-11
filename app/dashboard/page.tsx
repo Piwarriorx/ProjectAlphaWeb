@@ -142,7 +142,7 @@ export default function DashboardPage() {
     const currentUserRow = users.find(u => u.id === currentUserId)
     if (currentUserRow === undefined) return
 
-    if (currentUserRow.role !== 'admin' && !currentUserRow.hwid?.trim() && window.location.pathname !== '/hwid') {
+    if (currentUserRow.role !== 'admin' && currentUserRow.hwid_approved !== true && window.location.pathname !== '/hwid') {
       window.location.href = '/hwid'
     }
   }, [user, loading, users])

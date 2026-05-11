@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { login, register } from './actions'
 
 export default function LoginPage() {
@@ -8,10 +9,40 @@ export default function LoginPage() {
   const [isRegister, setIsRegister] = useState(false)
 
   useEffect(() => {
-     const session = localStorage.getItem('ezcrosshair_user')
+    const session = localStorage.getItem('ezcrosshair_user')
     if (session) {
-      window.location.href = '/dashboard'
+      let userData: { id?: number | string; userId?: number | string; user_id?: number | string; role?: string } | null = null
+
+      try {
+        userData = JSON.parse(session)
+      } catch {
+        localStorage.removeItem('ezcrosshair_user')
+        userData = null
+      }
+
+      const rawId = userData?.id ?? userData?.userId ?? userData?.user_id
+      const parsedId = typeof rawId === 'string' ? parseInt(rawId, 10) : rawId
+
+      if (!parsedId || Number.isNaN(parsedId)) {
+        localStorage.removeItem('ezcrosshair_user')
+      } else if (userData?.role === 'admin') {
+        window.location.href = '/dashboard'
+        return
+      } else {
+        ;(async () => {
+          const supabase = createClient()
+          const { data } = await supabase
+            .from('users')
+            .select('hwid_approved')
+            .eq('id', parsedId)
+            .single()
+
+          window.location.href = data?.hwid_approved === true ? '/dashboard' : '/hwid'
+        })()
+        return
+      }
     }
+
     const particlesContainer = document.getElementById('particles')
     if (particlesContainer && particlesContainer.children.length === 0) {
       for (let i = 0; i < 20; i++) {
@@ -60,7 +91,7 @@ export default function LoginPage() {
       role: result.role  // <-- Store role
     }))
     
-    window.location.href = '/dashboard'
+    window.location.href = result.redirectTo || '/dashboard'
   }
 }
 

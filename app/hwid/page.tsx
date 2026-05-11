@@ -18,6 +18,7 @@ export default function HwidPage() {
   const [hwid, setHwid] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [pendingApproval, setPendingApproval] = useState(false)
   const [message, setMessage] = useState('')
 
   useEffect(() => {
@@ -53,17 +54,25 @@ export default function HwidPage() {
 
     ;(async () => {
       const supabase = createClient()
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('users')
-        .select('hwid')
+        .select('hwid, hwid_approved')
         .eq('id', parsedId)
         .single()
 
-      if (data?.hwid?.trim()) {
+      if (error || !data) {
+        window.location.href = '/login'
+        return
+      }
+
+      const storedHwid = data.hwid?.trim() || ''
+      if (storedHwid && data.hwid_approved === true) {
         window.location.href = '/dashboard'
         return
       }
 
+      setHwid(storedHwid)
+      setPendingApproval(Boolean(storedHwid && data.hwid_approved !== true))
       setLoading(false)
     })()
   }, [])
@@ -82,8 +91,9 @@ export default function HwidPage() {
       return
     }
 
+    setPendingApproval(true)
     setMessage('HWID saved. Waiting for admin approval.')
-    window.location.href = '/dashboard'
+    setSaving(false)
   }
 
   if (loading) return <div style={{ color: '#fff', padding: 32 }}>Loading...</div>
@@ -93,8 +103,27 @@ export default function HwidPage() {
       <div style={{ width: '100%', maxWidth: '520px', background: 'rgba(20, 22, 35, 0.75)', border: '1px solid rgba(0, 255, 136, 0.18)', borderRadius: '16px', padding: '32px' }}>
         <h1 style={{ color: '#fff', fontSize: '28px', margin: 0 }}>HWID Setup</h1>
         <p style={{ color: '#5a6072', marginTop: '8px' }}>
-          {username ? `Welcome, ${username}.` : 'Paste your HWID below.'}
+          {pendingApproval
+            ? 'Your HWID is waiting for admin approval.'
+            : username
+              ? `Welcome, ${username}.`
+              : 'Paste your HWID below.'}
         </p>
+
+        {pendingApproval && (
+          <div style={{
+            marginTop: '20px',
+            padding: '14px 16px',
+            borderRadius: '10px',
+            background: 'rgba(255, 149, 0, 0.1)',
+            border: '1px solid rgba(255, 149, 0, 0.25)',
+            color: '#ff9500',
+            fontSize: '13px',
+            lineHeight: 1.5,
+          }}>
+            You cannot access the dashboard until an admin approves this HWID.
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} style={{ marginTop: '24px' }}>
           <label style={{ display: 'block', color: '#fff', fontSize: '14px', fontWeight: 600, marginBottom: '10px' }}>

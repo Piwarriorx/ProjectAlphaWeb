@@ -70,10 +70,22 @@ export async function login(formData: FormData) {
     return { error: 'Your account is pending approval. Please wait for admin confirmation.' }
   }
 
+  const { data: hwidData } = await supabase
+    .from('users')
+    .select('hwid_approved')
+    .eq('id', mappedUser.id)
+    .single()
+
+  const redirectTo =
+    mappedUser.role === 'admin' || hwidData?.hwid_approved === true
+      ? '/dashboard'
+      : '/hwid'
+
   return { 
     success: 'login', 
     userId: mappedUser.id, 
     username: mappedUser.username,
-    role: mappedUser.role
+    role: mappedUser.role,
+    redirectTo
   }
 }
