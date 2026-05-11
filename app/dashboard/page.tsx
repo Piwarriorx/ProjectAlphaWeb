@@ -1265,6 +1265,78 @@ useEffect(() => {
 
         {/* Admin - Management Tab */}
         {user.role === 'admin' && activeTab === 'management' && (
+          <div style={{ marginBottom: '32px', padding: '24px', background: 'rgba(20,22,35,0.7)', borderRadius: '12px' }}>
+  <h3 style={{ color: '#00ff88', marginBottom: '12px' }}>Update Group Expiration</h3>
+  <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+    <select
+      value={selectedGroupId}
+      onChange={e => setSelectedGroupId(e.target.value)}
+      style={{
+        padding: '6px 10px',
+        borderRadius: '6px',
+        background: 'rgba(10,12,21,0.8)',
+        color: '#fff',
+        border: '1px solid rgba(255,255,255,0.2)',
+      }}
+    >
+      <option value="">Select Group</option>
+      {sortedGroupExpirations.map(g => (
+        <option key={g.group_id} value={g.group_id}>{g.group_id}</option>
+      ))}
+    </select>
+
+    <input
+      type="number"
+      min={0}
+      placeholder="Hours"
+      value={hours}
+      onChange={e => setHours(Number(e.target.value))}
+      style={{ width: '60px', padding: '4px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.2)' }}
+    />
+    <input
+      type="number"
+      min={0}
+      placeholder="Minutes"
+      value={minutes}
+      onChange={e => setMinutes(Number(e.target.value))}
+      style={{ width: '60px', padding: '4px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.2)' }}
+    />
+    <input
+      type="number"
+      min={0}
+      placeholder="Seconds"
+      value={seconds}
+      onChange={e => setSeconds(Number(e.target.value))}
+      style={{ width: '60px', padding: '4px 8px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.2)' }}
+    />
+
+    <button
+      onClick={async () => {
+        if (!selectedGroupId) return alert('Select a group first!')
+        const now = new Date()
+        const expireTime = new Date(now.getTime() + hours*3600000 + minutes*60000 + seconds*1000)
+        const result = await updateGroupExpiration(selectedGroupId, now.toISOString(), expireTime.toISOString())
+        if (result.error) alert('Error: ' + result.error)
+        else {
+          alert('Group expiration updated!')
+          fetchGroupExpirations()
+          setHours(0); setMinutes(0); setSeconds(0)
+        }
+      }}
+      style={{
+        padding: '6px 14px',
+        background: '#00ff88',
+        color: '#0a0c15',
+        border: 'none',
+        borderRadius: '6px',
+        cursor: 'pointer',
+      }}
+    >
+      Save
+    </button>
+  </div>
+</div>
+
           <div>
             <div style={{
               background: 'rgba(20, 22, 35, 0.7)',
