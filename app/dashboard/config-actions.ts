@@ -9,7 +9,6 @@ export async function saveUserConfig(userId: number, configText: string) {
     console.log('Attempting to save config for user:', userId)
     console.log('Config text length:', configText.length)
 
-    // Use upsert instead of RPC to avoid potential function issues
     const { data, error } = await supabase
       .from('user_config')
       .upsert({
@@ -23,6 +22,9 @@ export async function saveUserConfig(userId: number, configText: string) {
 
     if (error) {
       console.error('Supabase upsert error:', error)
+      if (error.message.includes('does not exist')) {
+        return { error: 'The user_config table does not exist. Please run the SQL in create-user-config-table.sql in your Supabase SQL editor.' }
+      }
       return { error: `Database error: ${error.message}` }
     }
 
