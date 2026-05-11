@@ -69,6 +69,10 @@ export default function DashboardPage() {
     }
 
     const userData = JSON.parse(session)
+    console.log('User data from localStorage:', userData)
+    console.log('User ID type:', typeof userData?.id)
+    console.log('User ID value:', userData?.id)
+    
     setUser(userData)
 
     // Set default tab based on user role
@@ -80,8 +84,10 @@ export default function DashboardPage() {
 
     fetchUsers()
     fetchFiles()
-    if (userData) {
+    if (userData && userData.id) {
       fetchUserConfig(userData.id)
+    } else {
+      console.error('User data or ID is missing:', userData)
     }
   }, [])
 
@@ -168,21 +174,35 @@ export default function DashboardPage() {
   }
 
   async function handleSaveConfig() {
+    console.log('handleSaveConfig called, user object:', user)
+    
     if (!user) {
       setConfigMessage('User not found. Please log in again.')
       return
     }
     
-    if (!user.id || user.id === null || user.id === undefined) {
+    console.log('User ID:', user.id, 'Type:', typeof user.id, 'Value:', user.id)
+    
+    // Handle different ID formats (string, number, etc.)
+    let userId = user.id
+    if (typeof userId === 'string') {
+      userId = parseInt(userId, 10)
+      if (isNaN(userId)) {
+        setConfigMessage('Invalid user ID format. Please log in again.')
+        return
+      }
+    }
+    
+    if (!userId || userId === null || userId === undefined || userId === 0) {
       setConfigMessage('Invalid user ID. Please log in again.')
       return
     }
     
     setSavingConfig(true)
     setConfigMessage('')
-    console.log('Saving config for user ID:', user.id, 'user object:', user)
+    console.log('Saving config for processed user ID:', userId, 'original user object:', user)
     
-    const result = await saveUserConfig(user.id, configText)
+    const result = await saveUserConfig(userId, configText)
     if (result.error) {
       setConfigMessage(result.error)
     } else {
