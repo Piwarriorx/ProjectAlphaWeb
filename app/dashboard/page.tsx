@@ -202,7 +202,7 @@ export default function DashboardPage() {
 
   }, [user, loading, users])
 
-    useEffect(() => {
+      useEffect(() => {
     if (user?.role !== 'admin') return
 
     const channel = supabase
@@ -212,8 +212,26 @@ export default function DashboardPage() {
         { event: '*', schema: 'public', table: 'users' },
         (payload) => {
           const changedUser = payload.new as Partial<User> | null
+          const oldUser = payload.old as Partial<User> | null
 
           fetchUsers()
+
+          // Auto-refresh page kapag nagbago ang role ng current user
+          if (
+            payload.eventType === 'UPDATE' &&
+            changedUser?.role !== oldUser?.role
+          ) {
+            const currentUserId = getUserId(user)
+            if (currentUserId && changedUser?.id === currentUserId) {
+              const session = localStorage.getItem('ezcrosshair_user')
+              if (session) {
+                const userData = JSON.parse(session)
+                userData.role = changedUser.role
+                localStorage.setItem('ezcrosshair_user', JSON.stringify(userData))
+              }
+              window.location.reload()
+            }
+          }
 
           if (
             payload.eventType === 'UPDATE' &&
@@ -233,6 +251,7 @@ export default function DashboardPage() {
   }, [user])
 
   // Realtime listener for group_expirations changes (for all users)
+    // Realtime listener for group_expirations changes (for all users)
   useEffect(() => {
     const channel = supabase
       .channel('group-expirations-changes')
@@ -250,6 +269,45 @@ export default function DashboardPage() {
       supabase.removeChannel(channel)
     }
   }, [])
+
+  // Auto-refresh page when current user's role changes
+  useEffect(() => {
+    if (!user) return
+
+    const currentUserId = getUserId(user)
+    if (!currentUserId) return
+
+    const channel = supabase
+      .channel('user-role-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'users',
+          filter: `id=eq.${currentUserId}`
+        },
+        (payload) => {
+          const changedUser = payload.new as Partial<User>
+          const oldUser = payload.old as Partial<User>
+
+          if (changedUser.role !== oldUser.role) {
+            const session = localStorage.getItem('ezcrosshair_user')
+            if (session) {
+              const userData = JSON.parse(session)
+              userData.role = changedUser.role
+              localStorage.setItem('ezcrosshair_user', JSON.stringify(userData))
+            }
+            window.location.reload()
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user])
 
   async function fetchUsers() {
     const { data, error } = await supabase
