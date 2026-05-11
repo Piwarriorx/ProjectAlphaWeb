@@ -695,7 +695,7 @@ useEffect(() => {
           fontWeight: 600,
           fontFamily: 'monospace',
         }}>
-          {isGroupExpired ? 'Expired' : formatRemainingTime(userGroupExpiration.expiretime)} remaining
+          {isGroupExpired ? 'Expired' : formatRemainingTime(userGroupExpiration.expiretime)}
         </span>
       </div>
     ) : (
