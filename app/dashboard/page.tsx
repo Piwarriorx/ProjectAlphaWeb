@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { approveUser, rejectUser } from './actions'
 import { uploadFile, listFiles, deleteFile, getSignedDownloadUrl } from './file-actions'
 import { saveUserConfig, getUserConfig } from './config-actions'
-import { updateUserGroup, updateUserRole, updateUserHwidApproval } from './group-actions'
+import { updateUserGroup, updateUserRole, updateUserHwidApproval, bulkUpdateUserRole, bulkUpdateUserGroup, bulkDeleteUsers } from './group-actions'
 
 interface User {
   id: number
@@ -71,6 +71,10 @@ export default function DashboardPage() {
   const [savingConfig, setSavingConfig] = useState(false)
   const [managementMessage, setManagementMessage] = useState('')
   const [updatingGroup, setUpdatingGroup] = useState<number | null>(null)
+  const [selectedUserIds, setSelectedUserIds] = useState<number[]>([])
+  const [bulkRole, setBulkRole] = useState('user')
+  const [bulkGroupId, setBulkGroupId] = useState('not set')
+  const [bulkProcessing, setBulkProcessing] = useState(false)
   
   // Predefined groups
   const predefinedGroups = ['not set', '1', '2', '3', '4', '5']
@@ -187,6 +191,10 @@ export default function DashboardPage() {
     setUsers(data || [])
     setLoading(false)
   }
+
+  useEffect(() => {
+    setSelectedUserIds(prev => prev.filter(id => users.some(user => user.id === id)))
+  }, [users])
 
   async function fetchLaunchData() {
     const { data, error } = await supabase
@@ -385,6 +393,79 @@ export default function DashboardPage() {
     setTimeout(() => setManagementMessage(''), 3000)
   }
 
+  function toggleSelectedUser(userId: number) {
+    setSelectedUserIds(prev =>
+      prev.includes(userId)
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    )
+  }
+
+  function selectAllManagementUsers() {
+    const manageableUsers = users.filter(u => u.role !== 'pending').map(u => u.id)
+    setSelectedUserIds(manageableUsers)
+  }
+
+  function clearSelectedUsers() {
+    setSelectedUserIds([])
+  }
+
+  async function handleBulkRoleUpdate() {
+    if (selectedUserIds.length === 0) return
+    setBulkProcessing(true)
+    setManagementMessage('')
+
+    const result = await bulkUpdateUserRole(selectedUserIds, bulkRole)
+    if (result.error) {
+      setManagementMessage(result.error)
+    } else {
+      setManagementMessage(`Updated role for ${selectedUserIds.length} user(s) successfully!`)
+      clearSelectedUsers()
+      await fetchUsers()
+    }
+
+    setBulkProcessing(false)
+    setTimeout(() => setManagementMessage(''), 3000)
+  }
+
+  async function handleBulkGroupUpdate() {
+    if (selectedUserIds.length === 0) return
+    setBulkProcessing(true)
+    setManagementMessage('')
+
+    const result = await bulkUpdateUserGroup(selectedUserIds, bulkGroupId === 'not set' ? null : bulkGroupId)
+    if (result.error) {
+      setManagementMessage(result.error)
+    } else {
+      setManagementMessage(`Updated group for ${selectedUserIds.length} user(s) successfully!`)
+      clearSelectedUsers()
+      await fetchUsers()
+    }
+
+    setBulkProcessing(false)
+    setTimeout(() => setManagementMessage(''), 3000)
+  }
+
+  async function handleBulkDelete() {
+    if (selectedUserIds.length === 0) return
+    if (!confirm(`Delete ${selectedUserIds.length} selected user(s)?`)) return
+
+    setBulkProcessing(true)
+    setManagementMessage('')
+
+    const result = await bulkDeleteUsers(selectedUserIds)
+    if (result.error) {
+      setManagementMessage(result.error)
+    } else {
+      setManagementMessage(`Deleted ${selectedUserIds.length} user(s) successfully!`)
+      clearSelectedUsers()
+      await fetchUsers()
+    }
+
+    setBulkProcessing(false)
+    setTimeout(() => setManagementMessage(''), 3000)
+  }
+
   function logout() {
     localStorage.removeItem('ezcrosshair_user')
     window.location.href = '/login'
@@ -404,6 +485,13 @@ export default function DashboardPage() {
     : !hasApprovedHwid
       ? 'HWID pending approval'
       : 'Launch'
+  const manageableUsers = users
+    .filter(u => u.role !== 'pending')
+    .sort((a, b) => {
+      if (a.role === 'admin' && b.role !== 'admin') return -1
+      if (a.role !== 'admin' && b.role === 'admin') return 1
+      return 0
+    })
 
   if (!user) return null
   if (loading) return <div style={{ color: '#fff', padding: 32 }}>Loading...</div>
@@ -1124,6 +1212,147 @@ export default function DashboardPage() {
               </div>
 
               <div style={{
+                marginBottom: '18px',
+                padding: '16px',
+                borderRadius: '12px',
+                background: 'rgba(20, 22, 35, 0.5)',
+                border: '1px solid rgba(255, 149, 0, 0.15)',
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '12px',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}>
+                <div style={{ color: '#8b92a8', fontSize: '13px' }}>
+                  {selectedUserIds.length} selected
+                </div>
+
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={selectAllManagementUsers}
+                    disabled={bulkProcessing || manageableUsers.length === 0}
+                    style={{
+                      padding: '8px 12px',
+                      background: 'rgba(255, 149, 0, 0.12)',
+                      color: '#ff9500',
+                      border: '1px solid rgba(255, 149, 0, 0.25)',
+                      borderRadius: '8px',
+                      cursor: bulkProcessing || manageableUsers.length === 0 ? 'not-allowed' : 'pointer',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Select All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearSelectedUsers}
+                    disabled={bulkProcessing || selectedUserIds.length === 0}
+                    style={{
+                      padding: '8px 12px',
+                      background: 'transparent',
+                      color: '#5a6072',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      borderRadius: '8px',
+                      cursor: bulkProcessing || selectedUserIds.length === 0 ? 'not-allowed' : 'pointer',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Clear
+                  </button>
+                  <select
+                    value={bulkRole}
+                    onChange={(e) => setBulkRole(e.target.value)}
+                    disabled={bulkProcessing}
+                    style={{
+                      padding: '8px 10px',
+                      background: 'rgba(10, 12, 21, 0.8)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      borderRadius: '8px',
+                      color: '#fff',
+                      fontSize: '12px',
+                      cursor: bulkProcessing ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    <option value="user">user</option>
+                    <option value="admin">admin</option>
+                    <option value="pending">pending</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={handleBulkRoleUpdate}
+                    disabled={bulkProcessing || selectedUserIds.length === 0}
+                    style={{
+                      padding: '8px 12px',
+                      background: '#00ff88',
+                      color: '#0a0c15',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: bulkProcessing || selectedUserIds.length === 0 ? 'not-allowed' : 'pointer',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    Apply Role
+                  </button>
+                  <select
+                    value={bulkGroupId}
+                    onChange={(e) => setBulkGroupId(e.target.value)}
+                    disabled={bulkProcessing}
+                    style={{
+                      padding: '8px 10px',
+                      background: 'rgba(10, 12, 21, 0.8)',
+                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                      borderRadius: '8px',
+                      color: '#fff',
+                      fontSize: '12px',
+                      cursor: bulkProcessing ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {predefinedGroups.map(group => (
+                      <option key={group} value={group}>{group}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={handleBulkGroupUpdate}
+                    disabled={bulkProcessing || selectedUserIds.length === 0}
+                    style={{
+                      padding: '8px 12px',
+                      background: 'rgba(0, 255, 136, 0.12)',
+                      color: '#00ff88',
+                      border: '1px solid rgba(0, 255, 136, 0.3)',
+                      borderRadius: '8px',
+                      cursor: bulkProcessing || selectedUserIds.length === 0 ? 'not-allowed' : 'pointer',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    Apply Group
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBulkDelete}
+                    disabled={bulkProcessing || selectedUserIds.length === 0}
+                    style={{
+                      padding: '8px 12px',
+                      background: 'transparent',
+                      color: '#ff4444',
+                      border: '1px solid rgba(255, 68, 68, 0.4)',
+                      borderRadius: '8px',
+                      cursor: bulkProcessing || selectedUserIds.length === 0 ? 'not-allowed' : 'pointer',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    Delete Selected
+                  </button>
+                </div>
+              </div>
+
+              <div style={{
                 background: 'rgba(20, 22, 35, 0.5)',
                 borderRadius: '12px',
                 overflow: 'hidden',
@@ -1131,7 +1360,7 @@ export default function DashboardPage() {
               }}>
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: '1fr 120px minmax(180px, 240px) 150px',
+                  gridTemplateColumns: '48px 1fr 120px minmax(180px, 240px) 150px',
                   padding: '16px 24px',
                   background: 'rgba(0, 0, 0, 0.3)',
                   borderBottom: '1px solid rgba(255,255,255,0.05)',
@@ -1141,28 +1370,30 @@ export default function DashboardPage() {
                   letterSpacing: '1px',
                   fontWeight: 600,
                 }}>
+                  <div>Select</div>
                   <div>Username</div>
                   <div>Role</div>
                   <div>HWID</div>
                   <div>Group ID</div>
                 </div>
 
-                {users
-                  .filter(u => u.role !== 'pending')
-                  .sort((a, b) => {
-                    // Admin roles first
-                    if (a.role === 'admin' && b.role !== 'admin') return -1
-                    if (a.role !== 'admin' && b.role === 'admin') return 1
-                    return 0
-                  })
-                  .map(u => (
+                {manageableUsers.map(u => (
                   <div key={u.id} style={{
                     display: 'grid',
-                    gridTemplateColumns: '1fr 120px minmax(180px, 240px) 150px',
+                    gridTemplateColumns: '48px 1fr 120px minmax(180px, 240px) 150px',
                     padding: '16px 24px',
                     borderBottom: '1px solid rgba(255,255,255,0.05)',
                     alignItems: 'center',
                   }}>
+                    <div>
+                      <input
+                        type="checkbox"
+                        checked={selectedUserIds.includes(u.id)}
+                        onChange={() => toggleSelectedUser(u.id)}
+                        disabled={bulkProcessing}
+                        style={{ width: '16px', height: '16px', cursor: bulkProcessing ? 'not-allowed' : 'pointer' }}
+                      />
+                    </div>
                     <div style={{ color: '#fff', fontWeight: 600 }}>
                       {u.username}
                     </div>
@@ -1379,7 +1610,7 @@ export default function DashboardPage() {
                             transition: 'all 0.2s ease',
                           }}
                         >
-                          {!hasHwid ? 'Unavailable' : isApproved ? 'Deny' : 'Approve'}
+                          {!hasHwid ? 'Unavailable' : isApproved ? 'Revoke' : 'Approve'}
                         </button>
                       </div>
                     </div>

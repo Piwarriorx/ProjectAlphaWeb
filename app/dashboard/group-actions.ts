@@ -52,6 +52,39 @@ export async function updateUserHwidApproval(userId: number, approved: boolean) 
   return { success: true, data }
 }
 
+export async function bulkUpdateUserRole(userIds: number[], role: string) {
+  const supabase = await createServerSupabase()
+
+  for (const userId of userIds) {
+    const { error } = await supabase.rpc('update_user_role', { p_user_id: userId, p_role: role })
+    if (error) return { error: error.message }
+  }
+
+  return { success: true }
+}
+
+export async function bulkUpdateUserGroup(userIds: number[], groupId: string | null) {
+  const supabase = await createServerSupabase()
+
+  for (const userId of userIds) {
+    const { error } = await supabase.rpc('update_user_group', { p_user_id: userId, p_group_id: groupId })
+    if (error) return { error: error.message }
+  }
+
+  return { success: true }
+}
+
+export async function bulkDeleteUsers(userIds: number[]) {
+  const supabase = await createServerSupabase()
+
+  for (const userId of userIds) {
+    const { error } = await supabase.rpc('reject_user', { p_user_id: userId })
+    if (error) return { error: error.message }
+  }
+
+  return { success: true }
+}
+
 export async function getAvailableGroups() {
   const supabase = await createServerSupabase()
 
