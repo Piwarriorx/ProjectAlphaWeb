@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { approveUser, rejectUser } from './actions'
 import { uploadFile, listFiles, deleteFile, getSignedDownloadUrl } from './file-actions'
 import { saveUserConfig, getUserConfig } from './config-actions'
+import { updateUserGroup, getUsersWithGroups, getAvailableGroups } from './group-actions'
 
 interface User {
   id: number
@@ -12,6 +13,7 @@ interface User {
   role: string
   created_at: string
   last_login_at?: string | null
+  group_id?: string | null
 }
 
 interface FileRecord {
@@ -39,12 +41,15 @@ export default function DashboardPage() {
   const [files, setFiles] = useState<FileRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [time, setTime] = useState('')
-  const [activeTab, setActiveTab] = useState<'users' | 'files' | 'config'>('files')
+  const [activeTab, setActiveTab] = useState<'users' | 'files' | 'config' | 'management'>('files')
   const [uploadMessage, setUploadMessage] = useState('')
   const [uploading, setUploading] = useState(false)
   const [configText, setConfigText] = useState('')
   const [configMessage, setConfigMessage] = useState('')
   const [savingConfig, setSavingConfig] = useState(false)
+  const [managementMessage, setManagementMessage] = useState('')
+  const [availableGroups, setAvailableGroups] = useState<string[]>([])
+  const [updatingGroup, setUpdatingGroup] = useState<number | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -84,6 +89,7 @@ export default function DashboardPage() {
 
     fetchUsers()
     fetchFiles()
+    fetchAvailableGroups()
     
     // Try different possible ID field names like in handleSaveConfig
     let userId = userData.id || userData.user_id || userData.userId
@@ -105,7 +111,7 @@ export default function DashboardPage() {
   async function fetchUsers() {
     const { data, error } = await supabase
       .from('users')
-      .select('id, username, role, created_at, last_login_at')
+      .select('id, username, role, created_at, last_login_at, group_id')
       .order('created_at', { ascending: false })
 
     setUsers(data || [])
@@ -237,6 +243,44 @@ export default function DashboardPage() {
     setSavingConfig(false)
   }
 
+  async function fetchAvailableGroups() {
+    const { groups, error } = await getAvailableGroups()
+    if (!error) {
+      setAvailableGroups(groups)
+    }
+  }
+
+  async function handleUpdateGroup(userId: number, newGroupId: string) {
+    setUpdatingGroup(userId)
+    setManagementMessage('')
+    
+    let finalGroupId = newGroupId
+    
+    // Handle new group creation
+    if (newGroupId === '__new__') {
+      const groupName = prompt('Enter new group name:')
+      if (!groupName || groupName.trim() === '') {
+        setUpdatingGroup(null)
+        return
+      }
+      finalGroupId = groupName.trim()
+    }
+    
+    const result = await updateUserGroup(userId, finalGroupId === '' ? null : finalGroupId)
+    if (result.error) {
+      setManagementMessage(result.error)
+    } else {
+      setManagementMessage('User group updated successfully!')
+      fetchUsers()
+      fetchAvailableGroups()
+    }
+    
+    setUpdatingGroup(null)
+    
+    // Clear message after 3 seconds
+    setTimeout(() => setManagementMessage(''), 3000)
+  }
+
   function logout() {
     localStorage.removeItem('ezcrosshair_user')
     window.location.href = '/login'
@@ -358,6 +402,22 @@ export default function DashboardPage() {
               }}
             >
               Config
+            </button>
+            <button
+              onClick={() => setActiveTab('management')}
+              style={{
+                padding: '10px 24px',
+                borderRadius: '10px',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 600,
+                transition: 'all 0.2s ease',
+                background: activeTab === 'management' ? 'rgba(255, 149, 0, 0.15)' : 'transparent',
+                color: activeTab === 'management' ? '#ff9500' : '#5a6072',
+              }}
+            >
+              Management
             </button>
           </div>
         )}
@@ -818,6 +878,166 @@ export default function DashboardPage() {
                 >
                   {savingConfig ? 'Saving...' : 'Save Configuration'}
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Admin - Management Tab */}
+        {user.role === 'admin' && activeTab === 'management' && (
+          <div>
+            <div style={{
+              background: 'rgba(20, 22, 35, 0.7)',
+              border: '1px solid rgba(255, 149, 0, 0.2)',
+              borderRadius: '16px',
+              padding: '32px',
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '24px'
+              }}>
+                <h2 style={{ color: '#ff9500', fontSize: '24px', margin: 0 }}>
+                  User Group Management
+                </h2>
+                {managementMessage && (
+                  <div style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    background: managementMessage.includes('success') ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255, 68, 68, 0.1)',
+                    color: managementMessage.includes('success') ? '#00ff88' : '#ff4444',
+                    border: `1px solid ${managementMessage.includes('success') ? 'rgba(0, 255, 136, 0.3)' : 'rgba(255, 68, 68, 0.3)'}`,
+                  }}>
+                    {managementMessage}
+                  </div>
+                )}
+              </div>
+
+              <div style={{
+                background: 'rgba(20, 22, 35, 0.5)',
+                borderRadius: '12px',
+                overflow: 'hidden',
+                marginBottom: '24px'
+              }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 120px 150px 180px 120px',
+                  padding: '16px 24px',
+                  background: 'rgba(0, 0, 0, 0.3)',
+                  borderBottom: '1px solid rgba(255,255,255,0.05)',
+                  color: '#8b92a8',
+                  fontSize: '12px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                  fontWeight: 600,
+                }}>
+                  <div>Username</div>
+                  <div>Role</div>
+                  <div>Current Group</div>
+                  <div>Registered</div>
+                  <div>Actions</div>
+                </div>
+
+                {users.filter(u => u.role !== 'pending').map(u => (
+                  <div key={u.id} style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 120px 150px 180px 120px',
+                    padding: '16px 24px',
+                    borderBottom: '1px solid rgba(255,255,255,0.05)',
+                    alignItems: 'center',
+                  }}>
+                    <div style={{ color: '#fff', fontWeight: 600 }}>
+                      {u.username}
+                    </div>
+                    <div>
+                      <span style={{
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        textTransform: 'uppercase',
+                        fontWeight: 600,
+                        background: u.role === 'admin'
+                          ? 'rgba(255, 149, 0, 0.15)'
+                          : 'rgba(0, 255, 136, 0.1)',
+                        color: u.role === 'admin' ? '#ff9500' : '#00ff88',
+                      }}>
+                        {u.role}
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        background: u.group_id ? 'rgba(147, 51, 234, 0.15)' : 'rgba(90, 96, 114, 0.15)',
+                        color: u.group_id ? '#9333ea' : '#5a6072',
+                      }}>
+                        {u.group_id || 'No Group'}
+                      </span>
+                    </div>
+                    <div style={{ color: '#5a6072', fontSize: '13px' }}>
+                      {new Date(u.created_at).toLocaleDateString()}
+                    </div>
+                    <div>
+                      <select
+                        value={u.group_id || ''}
+                        onChange={(e) => handleUpdateGroup(u.id, e.target.value)}
+                        disabled={updatingGroup === u.id}
+                        style={{
+                          padding: '6px 10px',
+                          background: 'rgba(10, 12, 21, 0.8)',
+                          border: '1px solid rgba(255, 255, 255, 0.2)',
+                          borderRadius: '6px',
+                          color: '#fff',
+                          fontSize: '12px',
+                          cursor: updatingGroup === u.id ? 'not-allowed' : 'pointer',
+                          opacity: updatingGroup === u.id ? 0.6 : 1,
+                        }}
+                      >
+                        <option value="">No Group</option>
+                        {availableGroups.map(group => (
+                          <option key={group} value={group}>{group}</option>
+                        ))}
+                        <option value="__new__">+ New Group</option>
+                      </select>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{
+                background: 'rgba(10, 12, 21, 0.5)',
+                borderRadius: '8px',
+                padding: '16px',
+                border: '1px solid rgba(255, 149, 0, 0.2)',
+              }}>
+                <h3 style={{ color: '#ff9500', fontSize: '16px', marginBottom: '12px' }}>
+                  Quick Stats
+                </h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                  <div>
+                    <div style={{ color: '#5a6072', fontSize: '12px', marginBottom: '4px' }}>Total Users</div>
+                    <div style={{ color: '#fff', fontSize: '20px', fontWeight: 600 }}>
+                      {users.filter(u => u.role !== 'pending').length}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ color: '#5a6072', fontSize: '12px', marginBottom: '4px' }}>Users in Groups</div>
+                    <div style={{ color: '#00ff88', fontSize: '20px', fontWeight: 600 }}>
+                      {users.filter(u => u.role !== 'pending' && u.group_id).length}
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ color: '#5a6072', fontSize: '12px', marginBottom: '4px' }}>Total Groups</div>
+                    <div style={{ color: '#9333ea', fontSize: '20px', fontWeight: 600 }}>
+                      {availableGroups.length}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
