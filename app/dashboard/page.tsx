@@ -555,10 +555,12 @@ useEffect(() => {
     const now = new Date()
     const expireDate = new Date(now.getTime() + totalSeconds * 1000)
 
-    console.log('Attempting to save expiration for group:', editingGroupId, '
+    console.log('Attempting to save expiration for group:', editingGroupId, 'Expire Time:', expireDate.toISOString());
+    const result = await updateGroupExpiration(
       editingGroupId,
       expireDate.toISOString()
-    )nsole.log('Result from updateGroupExpiration server action:', result);
+    )
+    console.log('Result from updateGroupExpiration server action:', result);
 
     if (result.error) {
       setManagementMessage(result.error)
@@ -1767,7 +1769,17 @@ useEffect(() => {
                   </p>
                 </div>
                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                  {man
+                  {managementMessage && (
+                    <div style={{
+                      padding: '8px 16px',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      background: managementMessage.includes('success') ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255, 68, 68, 0.1)',
+                      color: managementMessage.includes('success') ? '#00ff88' : '#ff4444',
+                      border: `1px solid ${managementMessage.includes('success') ? 'rgba(0, 255, 136, 0.3)' : 'rgba(255, 68, 68, 0.3)'}`,
+                    }}>
+                      {managementMessage}
                     </div>
                   )}
                   <div style={{
