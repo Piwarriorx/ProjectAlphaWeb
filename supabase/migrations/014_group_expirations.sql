@@ -16,6 +16,11 @@ COMMENT ON COLUMN public.group_expirations.expiretime IS 'When the group expires
 
 ALTER TABLE public.group_expirations ENABLE ROW LEVEL SECURITY;
 
+-- Drop existing policies to avoid conflicts, then recreate
+DROP POLICY IF EXISTS "Allow read access to group expirations" ON public.group_expirations;
+DROP POLICY IF EXISTS "Allow service role full access to group expirations" ON public.group_expirations;
+DROP POLICY IF EXISTS "Allow authenticated users to manage group expirations" ON public.group_expirations;
+
 CREATE POLICY "Allow read access to group expirations" ON public.group_expirations
   FOR SELECT USING (true);
 
@@ -25,18 +30,37 @@ CREATE POLICY "Allow service role full access to group expirations" ON public.gr
     OR current_user LIKE 'service_role%'
   );
 
--- Additional policy for authenticated users via RPC (SECURITY DEFINER bypasses RLS but we need this for direct access too)
 CREATE POLICY "Allow authenticated users to manage group expirations" ON public.group_expirations
   FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
-CREATE OR REPLACE FUNCTION public.update_group_expiration(p_group_id TEXT, p_expiretime TIMESTAMPTZ)
+-- ============================================
+-- Drop ALL existing functions first to avoid return type conflicts
+-- ============================================
+DROP FUNCTION IF EXISTS public.update_group_expiration(TEXT, TIMESTAMPTZ);
+DROP FUNCTION IF EXISTS public.update_group_expiration(TIMESTAMPTZ, TEXT);
+DROP FUNCTION IF EXISTS public.update_group_expiration(JSONB);
+DROP FUNCTION IF EXISTS public.get_group_expiration(TEXT);
+DROP FUNCTION IF EXISTS public.delete_group_expiration(TEXT);
+
+-- ============================================
+-- Recreate functions
+-- ============================================
+
+CREATE OR REPLACE FUNCTION public.update_group_expiration(payload JSONB)
 RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
+DECLARE
+  v_group_id TEXT := payload->>'group_id';
+  v_expiretime TIMESTAMPTZ := (payload->>'expiretime')::TIMESTAMPTZ;
 BEGIN
+  IF v_group_id IS NULL OR v_expiretime IS NULL THEN
+    RAISE EXCEPTION 'group_id and expiretime are required';
+  END IF;
+
   INSERT INTO public.group_expirations (group_id, servertime, expiretime)
-  VALUES (p_group_id, NOW(), p_expiretime)
+  VALUES (v_group_id, NOW(), v_expiretime)
   ON CONFLICT (group_id)
   DO UPDATE SET
     servertime = NOW(),
