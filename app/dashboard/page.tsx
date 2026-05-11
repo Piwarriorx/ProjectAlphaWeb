@@ -25,6 +25,13 @@ interface LaunchCredential {
   version: string
 }
 
+interface GroupExpiration {
+  id: number
+  group_id: string
+  servertime: string
+  expiretime: string
+}
+
 interface FileRecord {
   id: number
   filename: string
@@ -42,6 +49,36 @@ function formatBytes(bytes: number) {
   const sizes = ['B', 'KB', 'MB', 'GB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString('en-PH', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  })
+}
+
+function formatRemainingTime(expiretime: string) {
+  const diff = new Date(expiretime).getTime() - Date.now()
+  if (Number.isNaN(diff)) return 'Invalid date'
+  if (diff <= 0) return 'Expired'
+
+  const totalMinutes = Math.floor(diff / 60000)
+  const days = Math.floor(totalMinutes / 1440)
+  const hours = Math.floor((totalMinutes % 1440) / 60)
+  const minutes = totalMinutes % 60
+
+  const parts = []
+  if (days > 0) parts.push(`${days}d`)
+  if (hours > 0) parts.push(`${hours}h`)
+  if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`)
+  return parts.join(' ')
 }
 
 function getUserId(user: User | null) {
@@ -62,8 +99,9 @@ export default function DashboardPage() {
   const [files, setFiles] = useState<FileRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [time, setTime] = useState('')
-  const [activeTab, setActiveTab] = useState<'users' | 'files' | 'config' | 'management'>('files')
+  const [activeTab, setActiveTab] = useState<'users' | 'files' | 'config' | 'management' | 'group'>('files')
   const [launchData, setLaunchData] = useState<LaunchCredential | null>(null)
+  const [groupExpirations, setGroupExpirations] = useState<GroupExpiration[]>([])
   const [uploadMessage, setUploadMessage] = useState('')
   const [uploading, setUploading] = useState(false)
   const [configText, setConfigText] = useState('')
@@ -117,6 +155,7 @@ export default function DashboardPage() {
 
     fetchUsers()
     fetchFiles()
+    fetchGroupExpirations()
     
     // Try different possible ID field names like in handleSaveConfig
     let userId = userData.id || userData.user_id || userData.userId
@@ -218,6 +257,21 @@ export default function DashboardPage() {
   async function fetchFiles() {
     const { files, error } = await listFiles()
     if (!error) setFiles(files)
+  }
+
+  async function fetchGroupExpirations() {
+    const { data, error } = await supabase
+      .from('group_expirations')
+      .select('id, group_id, servertime, expiretime')
+      .order('group_id', { ascending: true })
+
+    if (error) {
+      console.error('Error fetching group expirations:', error)
+      setGroupExpirations([])
+      return
+    }
+
+    setGroupExpirations((data || []) as GroupExpiration[])
   }
 
   async function fetchUserConfig(userId: number) {
@@ -492,6 +546,7 @@ export default function DashboardPage() {
       if (a.role !== 'admin' && b.role === 'admin') return 1
       return 0
     })
+  const sortedGroupExpirations = [...groupExpirations].sort((a, b) => a.group_id.localeCompare(b.group_id))
 
   if (!user) return null
   if (loading) return <div style={{ color: '#fff', padding: 32 }}>Loading...</div>
@@ -713,6 +768,22 @@ export default function DashboardPage() {
               }}
             >
               Management
+            </button>
+            <button
+              onClick={() => setActiveTab('group')}
+              style={{
+                padding: '10px 24px',
+                borderRadius: '10px',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 600,
+                transition: 'all 0.2s ease',
+                background: activeTab === 'group' ? 'rgba(255, 149, 0, 0.15)' : 'transparent',
+                color: activeTab === 'group' ? '#ff9500' : '#5a6072',
+              }}
+            >
+              Group
             </button>
           </div>
         )}
@@ -1619,6 +1690,118 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+        )}
+
+        {/* Admin - Group Tab */}
+        {user.role === 'admin' && activeTab === 'group' && (
+          <div>
+            <div style={{
+              background: 'rgba(20, 22, 35, 0.7)',
+              border: '1px solid rgba(255, 149, 0, 0.2)',
+              borderRadius: '16px',
+              padding: '32px',
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '24px'
+              }}>
+                <div>
+                  <h2 style={{ color: '#ff9500', fontSize: '24px', margin: 0 }}>
+                    Group Expirations
+                  </h2>
+                  <p style={{ color: '#5a6072', fontSize: '13px', margin: '6px 0 0' }}>
+                    View each group's server time, expiration time, and remaining time.
+                  </p>
+                </div>
+                <div style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  background: 'rgba(0, 255, 136, 0.1)',
+                  color: '#00ff88',
+                  border: '1px solid rgba(0, 255, 136, 0.3)',
+                }}>
+                  {sortedGroupExpirations.length} group(s)
+                </div>
+              </div>
+
+              <div style={{
+                background: 'rgba(20, 22, 35, 0.5)',
+                borderRadius: '12px',
+                overflow: 'hidden',
+              }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1.2fr 1.2fr 1fr',
+                  padding: '16px 24px',
+                  background: 'rgba(0, 0, 0, 0.3)',
+                  borderBottom: '1px solid rgba(255,255,255,0.05)',
+                  color: '#8b92a8',
+                  fontSize: '12px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                  fontWeight: 600,
+                }}>
+                  <div>Group ID</div>
+                  <div>Server Time</div>
+                  <div>Expire Time</div>
+                  <div>Remaining</div>
+                </div>
+
+                {sortedGroupExpirations.length === 0 && (
+                  <div style={{
+                    padding: '28px 24px',
+                    color: '#5a6072',
+                    textAlign: 'center',
+                    fontSize: '14px',
+                  }}>
+                    No group expirations configured yet.
+                  </div>
+                )}
+
+                {sortedGroupExpirations.map(group => (
+                  <div key={group.id} style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1.2fr 1.2fr 1fr',
+                    padding: '16px 24px',
+                    borderBottom: '1px solid rgba(255,255,255,0.05)',
+                    alignItems: 'center',
+                  }}>
+                    <div style={{ color: '#fff', fontWeight: 600 }}>
+                      {group.group_id}
+                    </div>
+                    <div style={{ color: '#8b92a8', fontSize: '13px' }}>
+                      {formatDateTime(group.servertime)}
+                    </div>
+                    <div style={{ color: '#8b92a8', fontSize: '13px' }}>
+                      {formatDateTime(group.expiretime)}
+                    </div>
+                    <div>
+                      <span style={{
+                        display: 'inline-flex',
+                        padding: '4px 10px',
+                        borderRadius: '999px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        background: new Date(group.expiretime).getTime() <= Date.now()
+                          ? 'rgba(255, 68, 68, 0.12)'
+                          : 'rgba(0, 255, 136, 0.12)',
+                        color: new Date(group.expiretime).getTime() <= Date.now()
+                          ? '#ff4444'
+                          : '#00ff88',
+                      }}>
+                        {formatRemainingTime(group.expiretime)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         )}
         {/* Regular User - Tabs */}
         {user.role === 'user' && (
