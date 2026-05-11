@@ -26,6 +26,18 @@ export async function getUsersWithGroups() {
   return { users: data || [], error: null }
 }
 
+export async function updateUserRole(userId: number, role: string) {
+  const supabase = await createServerSupabase()
+
+  const { error } = await supabase
+    .from('users')
+    .update({ role })
+    .eq('id', userId)
+
+  if (error) return { error: error.message }
+  return { success: true }
+}
+
 export async function getAvailableGroups() {
   const supabase = await createServerSupabase()
 
