@@ -21,7 +21,7 @@ export async function getUsersWithGroups() {
 
   const { data, error } = await supabase
     .from('users')
-    .select('id, username, role, group_id, hwid, created_at, last_login_at')
+    .select('id, username, role, group_id, hwid, hwid_approved, created_at, last_login_at')
     .order('created_at', { ascending: false })
 
   if (error) return { users: [], error: error.message }
@@ -35,6 +35,18 @@ export async function updateUserRole(userId: number, role: string) {
     .rpc('update_user_role', { p_user_id: userId, p_role: role })
 
   console.log('Role update result:', { data, error })
+
+  if (error) return { error: error.message }
+  return { success: true, data }
+}
+
+export async function updateUserHwidApproval(userId: number, approved: boolean) {
+  const supabase = await createServerSupabase()
+
+  const { data, error } = await supabase
+    .rpc('update_user_hwid_approval', { p_user_id: userId, p_hwid_approved: approved })
+
+  console.log('HWID approval update result:', { data, error })
 
   if (error) return { error: error.message }
   return { success: true, data }

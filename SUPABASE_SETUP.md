@@ -69,6 +69,7 @@ After creating the bucket, run these additional migrations in the SQL Editor:
 - `supabase/migrations/007_update_user_management.sql`
 - `supabase/migrations/008_add_group_id_to_users.sql`
 - `supabase/migrations/009_add_hwid_and_launch_credentials.sql`
+- `supabase/migrations/010_add_hwid_approval.sql`
 
 ## 7. Register New Users
 
@@ -89,6 +90,7 @@ Anyone can register via the `/login` page. New accounts start with the `pending`
 | `created_at`   | `timestamptz`| Account creation timestamp               |
 | `group_id`     | `text`      | Optional user group                       |
 | `hwid`         | `text`      | Hardware ID for launch URL               |
+| `hwid_approved`| `boolean`   | Whether the HWID is approved              |
 
 ### RPC Functions
 

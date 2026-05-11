@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { approveUser, rejectUser } from './actions'
 import { uploadFile, listFiles, deleteFile, getSignedDownloadUrl } from './file-actions'
 import { saveUserConfig, getUserConfig } from './config-actions'
-import { updateUserGroup, updateUserRole } from './group-actions'
+import { updateUserGroup, updateUserRole, updateUserHwidApproval } from './group-actions'
 
 interface User {
   id: number
@@ -17,6 +17,7 @@ interface User {
   last_login_at?: string | null
   group_id?: string | null
   hwid?: string | null
+  hwid_approved?: boolean | null
 }
 
 interface LaunchCredential {
@@ -135,7 +136,7 @@ export default function DashboardPage() {
   async function fetchUsers() {
     const { data, error } = await supabase
       .from('users')
-      .select('id, username, role, created_at, last_login_at, group_id, hwid')
+      .select('id, username, role, created_at, last_login_at, group_id, hwid, hwid_approved')
       .order('created_at', { ascending: false })
 
     setUsers(data || [])
@@ -322,6 +323,23 @@ export default function DashboardPage() {
     setTimeout(() => setManagementMessage(''), 3000)
   }
 
+  async function handleUpdateHwidApproval(userId: number, approved: boolean) {
+    setUpdatingGroup(userId)
+    setManagementMessage('')
+
+    const result = await updateUserHwidApproval(userId, approved)
+    if (result.error) {
+      setManagementMessage(result.error)
+    } else {
+      setManagementMessage(approved ? 'HWID approved successfully!' : 'HWID approval revoked!')
+      fetchUsers()
+    }
+
+    setUpdatingGroup(null)
+
+    setTimeout(() => setManagementMessage(''), 3000)
+  }
+
   function logout() {
     localStorage.removeItem('ezcrosshair_user')
     window.location.href = '/login'
@@ -330,11 +348,17 @@ export default function DashboardPage() {
   const currentUserId = getUserId(user)
   const currentUserRow = currentUserId ? users.find(u => u.id === currentUserId) : null
   const currentHwid = currentUserRow?.hwid?.trim() || ''
+  const hasApprovedHwid = currentUserRow?.role === 'admin' || currentUserRow?.hwid_approved === true
   const launchUrl =
     launchData && currentHwid
       ? `ezcrosshairalpha://launch?token=${encodeURIComponent(launchData.token)}&hw=${encodeURIComponent(currentHwid)}&ver=${encodeURIComponent(launchData.version)}`
       : ''
-  const canLaunch = Boolean(launchUrl)
+  const canLaunch = Boolean(launchUrl) && hasApprovedHwid
+  const launchLabel = !launchUrl
+    ? 'Launch unavailable'
+    : !hasApprovedHwid
+      ? 'HWID pending approval'
+      : 'Launch'
 
   if (!user) return null
   if (loading) return <div style={{ color: '#fff', padding: 32 }}>Loading...</div>
@@ -446,7 +470,7 @@ export default function DashboardPage() {
                 e.currentTarget.style.borderColor = 'rgba(0, 255, 136, 0.35)'
               }}
             >
-              {canLaunch ? 'Launch' : 'Launch unavailable'}
+              {launchLabel}
             </button>
           </div>
 
@@ -1173,6 +1197,150 @@ export default function DashboardPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          </div>
+
+          <div style={{
+            background: 'rgba(20, 22, 35, 0.7)',
+            border: '1px solid rgba(0, 255, 136, 0.2)',
+            borderRadius: '16px',
+            padding: '32px',
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '24px'
+            }}>
+              <div>
+                <h2 style={{ color: '#00ff88', fontSize: '24px', margin: 0 }}>
+                  HWID Approval
+                </h2>
+                <p style={{ color: '#5a6072', fontSize: '13px', margin: '6px 0 0' }}>
+                  Approve device IDs before launch is allowed.
+                </p>
+              </div>
+            </div>
+
+            <div style={{
+              background: 'rgba(20, 22, 35, 0.5)',
+              borderRadius: '12px',
+              overflow: 'hidden',
+            }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr minmax(220px, 1.6fr) 140px 140px',
+                padding: '16px 24px',
+                background: 'rgba(0, 0, 0, 0.3)',
+                borderBottom: '1px solid rgba(255,255,255,0.05)',
+                color: '#8b92a8',
+                fontSize: '12px',
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+                fontWeight: 600,
+              }}>
+                <div>Username</div>
+                <div>HWID</div>
+                <div>Status</div>
+                <div>Action</div>
+              </div>
+
+              {users
+                .filter(u => u.role !== 'pending')
+                .sort((a, b) => {
+                  const aMissing = !a.hwid?.trim()
+                  const bMissing = !b.hwid?.trim()
+                  if (aMissing !== bMissing) return aMissing ? -1 : 1
+                  const aApproved = a.hwid_approved === true
+                  const bApproved = b.hwid_approved === true
+                  if (aApproved !== bApproved) return aApproved ? 1 : -1
+                  return a.username.localeCompare(b.username)
+                })
+                .map(u => {
+                  const hasHwid = Boolean(u.hwid?.trim())
+                  const isApproved = u.hwid_approved === true
+
+                  return (
+                    <div key={u.id} style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr minmax(220px, 1.6fr) 140px 140px',
+                      padding: '16px 24px',
+                      borderBottom: '1px solid rgba(255,255,255,0.05)',
+                      alignItems: 'center',
+                    }}>
+                      <div style={{ color: '#fff', fontWeight: 600 }}>
+                        {u.username}
+                      </div>
+                      <div>
+                        <div
+                          title={u.hwid || 'not set'}
+                          style={{
+                            color: hasHwid ? '#fff' : '#5a6072',
+                            fontSize: '12px',
+                            fontFamily: 'monospace',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {u.hwid || 'not set'}
+                        </div>
+                      </div>
+                      <div>
+                        <span style={{
+                          padding: '4px 10px',
+                          borderRadius: '999px',
+                          fontSize: '11px',
+                          textTransform: 'uppercase',
+                          fontWeight: 700,
+                          background: !hasHwid
+                            ? 'rgba(90, 96, 114, 0.15)'
+                            : isApproved
+                              ? 'rgba(0, 255, 136, 0.12)'
+                              : 'rgba(255, 149, 0, 0.12)',
+                          color: !hasHwid
+                            ? '#5a6072'
+                            : isApproved
+                              ? '#00ff88'
+                              : '#ff9500',
+                        }}>
+                          {!hasHwid ? 'No HWID' : isApproved ? 'Approved' : 'Pending'}
+                        </span>
+                      </div>
+                      <div>
+                        <button
+                          onClick={() => handleUpdateHwidApproval(u.id, !isApproved)}
+                          disabled={!hasHwid || updatingGroup === u.id}
+                          style={{
+                            padding: '6px 14px',
+                            background: !hasHwid
+                              ? 'rgba(58, 61, 78, 0.5)'
+                              : isApproved
+                                ? 'transparent'
+                                : 'rgba(0, 255, 136, 0.12)',
+                            color: !hasHwid
+                              ? '#5a6072'
+                              : isApproved
+                                ? '#ff6b6b'
+                                : '#00ff88',
+                            border: `1px solid ${!hasHwid
+                              ? 'rgba(90, 96, 114, 0.35)'
+                              : isApproved
+                                ? 'rgba(255, 107, 107, 0.4)'
+                                : 'rgba(0, 255, 136, 0.35)'}`,
+                            borderRadius: '8px',
+                            cursor: !hasHwid || updatingGroup === u.id ? 'not-allowed' : 'pointer',
+                            fontSize: '12px',
+                            fontWeight: 700,
+                            transition: 'all 0.2s ease',
+                          }}
+                        >
+                          {!hasHwid ? 'Unavailable' : isApproved ? 'Revoke' : 'Approve'}
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
             </div>
           </div>
         )}
