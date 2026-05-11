@@ -905,7 +905,7 @@ export default function DashboardPage() {
               }}>
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: '1fr 120px 150px 180px 120px',
+                  gridTemplateColumns: '1fr 120px 150px',
                   padding: '16px 24px',
                   background: 'rgba(0, 0, 0, 0.3)',
                   borderBottom: '1px solid rgba(255,255,255,0.05)',
@@ -918,14 +918,12 @@ export default function DashboardPage() {
                   <div>Username</div>
                   <div>Role</div>
                   <div>Current Group</div>
-                  <div>Registered</div>
-                  <div>Actions</div>
                 </div>
 
                 {users.filter(u => u.role !== 'pending').map(u => (
                   <div key={u.id} style={{
                     display: 'grid',
-                    gridTemplateColumns: '1fr 120px 150px 180px 120px',
+                    gridTemplateColumns: '1fr 120px 150px',
                     padding: '16px 24px',
                     borderBottom: '1px solid rgba(255,255,255,0.05)',
                     alignItems: 'center',
@@ -969,54 +967,8 @@ export default function DashboardPage() {
                         ))}
                       </select>
                     </div>
-                    <div style={{ color: '#5a6072', fontSize: '13px' }}>
-                      {new Date(u.created_at).toLocaleDateString()}
-                    </div>
-                    <div>
-                      <span style={{
-                        padding: '4px 10px',
-                        borderRadius: '6px',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        background: u.group_id && u.group_id !== 'not set' ? 'rgba(147, 51, 234, 0.15)' : 'rgba(90, 96, 114, 0.15)',
-                        color: u.group_id && u.group_id !== 'not set' ? '#9333ea' : '#5a6072',
-                      }}>
-                        {u.group_id && u.group_id !== 'not set' ? u.group_id : 'not set'}
-                      </span>
-                    </div>
                   </div>
                 ))}
-              </div>
-
-              <div style={{
-                background: 'rgba(10, 12, 21, 0.5)',
-                borderRadius: '8px',
-                padding: '16px',
-                border: '1px solid rgba(255, 149, 0, 0.2)',
-              }}>
-                <h3 style={{ color: '#ff9500', fontSize: '16px', marginBottom: '12px' }}>
-                  Quick Stats
-                </h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
-                  <div>
-                    <div style={{ color: '#5a6072', fontSize: '12px', marginBottom: '4px' }}>Total Users</div>
-                    <div style={{ color: '#fff', fontSize: '20px', fontWeight: 600 }}>
-                      {users.filter(u => u.role !== 'pending').length}
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ color: '#5a6072', fontSize: '12px', marginBottom: '4px' }}>Users in Groups</div>
-                    <div style={{ color: '#00ff88', fontSize: '20px', fontWeight: 600 }}>
-                      {users.filter(u => u.role !== 'pending' && u.group_id && u.group_id !== 'not set').length}
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ color: '#5a6072', fontSize: '12px', marginBottom: '4px' }}>Total Groups</div>
-                    <div style={{ color: '#9333ea', fontSize: '20px', fontWeight: 600 }}>
-                      {predefinedGroups.length - 1}
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
