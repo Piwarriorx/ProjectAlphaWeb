@@ -311,6 +311,52 @@ export default function DashboardPage() {
             <div style={{ color: '#fff', fontSize: '20px', fontFamily: 'monospace', fontWeight: 600, letterSpacing: '2px', marginTop: '6px' }}>
               {time} <span style={{ fontSize: '11px', color: '#5a6072', fontWeight: 400, letterSpacing: '1px' }}>PHT</span>
             </div>
+
+            {/* Users in the same group */}
+            <div style={{
+              marginTop: '12px',
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '8px',
+              alignItems: 'center',
+              maxWidth: '520px',
+            }}>
+              {(() => {
+                const myGroup = user.group_id || 'not set'
+                const sameGroup = users
+                  .filter(u => (u.group_id || 'not set') === myGroup)
+                  .filter(u => u.role !== 'pending')
+                  .sort((a, b) => a.username.localeCompare(b.username))
+
+                if (sameGroup.length === 0) {
+                  return <span style={{ color: '#5a6072', fontSize: '12px' }}>No users in your group</span>
+                }
+
+                return sameGroup.map(u => (
+                  <span key={u.id} style={{
+                    padding: '6px 10px',
+                    borderRadius: '999px',
+                    background: 'rgba(10, 12, 21, 0.65)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    color: '#fff',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}>
+                    <span style={{
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      background: u.role === 'admin' ? '#ff9500' : '#00ff88',
+                      display: 'inline-block',
+                    }} />
+                    {u.username}
+                  </span>
+                ))
+              })()}
+            </div>
           </div>
 
           <button
@@ -342,6 +388,7 @@ export default function DashboardPage() {
             <span style={{ fontSize: '14px' }}>→</span> Log Out
           </button>
         </div>
+
 
         {/* Admin Tabs */}
         {user.role === 'admin' && (
@@ -935,7 +982,7 @@ export default function DashboardPage() {
                 }}>
                   <div>Username</div>
                   <div>Role</div>
-                  <div>Current Group</div>
+                  <div>Group ID</div>
                 </div>
 
                 {users
