@@ -84,10 +84,21 @@ export default function DashboardPage() {
 
     fetchUsers()
     fetchFiles()
-    if (userData && userData.id) {
-      fetchUserConfig(userData.id)
+    
+    // Try different possible ID field names like in handleSaveConfig
+    let userId = userData.id || userData.user_id || userData.userId
+    console.log('Extracted userId in useEffect:', userId, 'Type:', typeof userId)
+    
+    // Convert to number if it's a string
+    if (typeof userId === 'string') {
+      userId = parseInt(userId, 10)
+    }
+    
+    if (userId && !isNaN(userId) && userId !== 0) {
+      console.log('Calling fetchUserConfig with userId:', userId)
+      fetchUserConfig(userId)
     } else {
-      console.error('User data or ID is missing:', userData)
+      console.error('User data or ID is missing/invalid:', userData, 'Extracted ID:', userId)
     }
   }, [])
 
@@ -107,6 +118,8 @@ export default function DashboardPage() {
   }
 
   async function fetchUserConfig(userId: number) {
+    console.log('fetchUserConfig called with userId:', userId, 'Type:', typeof userId)
+    
     if (!userId || userId === null || userId === undefined) {
       console.error('Invalid userId in fetchUserConfig:', userId)
       return
@@ -114,7 +127,10 @@ export default function DashboardPage() {
     
     console.log('Fetching config for user ID:', userId)
     const { configText, error } = await getUserConfig(userId)
+    console.log('getUserConfig result:', { configText, error })
+    
     if (!error) {
+      console.log('Setting configText state to:', configText)
       setConfigText(configText)
     } else {
       console.error('Error fetching user config:', error)
