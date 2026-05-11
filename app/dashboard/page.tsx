@@ -136,22 +136,8 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!user || loading) return
 
-    const currentUserId = getUserId(user)
-    if (!currentUserId) return
-
-    const currentUserRow = users.find(u => u.id === currentUserId)
-    if (currentUserRow === undefined) return
-
-    if (currentUserRow.role !== 'admin' && currentUserRow.hwid_approved !== true && window.location.pathname !== '/hwid') {
-      window.location.href = '/hwid'
-    }
-  }, [user, loading, users])
-
-  useEffect(() => {
-    if (user?.role !== 'admin') return
-
     const channel = supabase
-      .channel('admin-hwid-requests')
+      .channel('users-realtime-sync')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'users' },
@@ -161,6 +147,7 @@ export default function DashboardPage() {
           fetchUsers()
 
           if (
+            user?.role === 'admin' &&
             payload.eventType === 'UPDATE' &&
             changedUser?.hwid?.trim() &&
             changedUser.hwid_approved !== true
@@ -175,7 +162,51 @@ export default function DashboardPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user])
+  }, [user, loading])
+
+  useEffect(() => {
+    if (!user || loading) return
+
+    const currentUserId = getUserId(user)
+    if (!currentUserId) return
+
+    const currentUserRow = users.find(u => u.id === currentUserId)
+    if (!currentUserRow) return
+
+    setUser(prev => {
+      if (!prev) return prev
+
+      if (
+        prev.username === currentUserRow.username &&
+        prev.role === currentUserRow.role &&
+        prev.group_id === currentUserRow.group_id &&
+        prev.hwid === currentUserRow.hwid &&
+        prev.hwid_approved === currentUserRow.hwid_approved
+      ) {
+        return prev
+      }
+
+      const nextUser = {
+        ...prev,
+        username: currentUserRow.username,
+        role: currentUserRow.role,
+        group_id: currentUserRow.group_id,
+        hwid: currentUserRow.hwid,
+        hwid_approved: currentUserRow.hwid_approved,
+      }
+
+      localStorage.setItem('ezcrosshair_user', JSON.stringify(nextUser))
+      return nextUser
+    })
+
+    if (currentUserRow.role !== 'admin' && currentUserRow.hwid_approved !== true && window.location.pathname !== '/hwid') {
+      window.location.href = '/hwid'
+    }
+
+    if (currentUserRow.role === 'admin' && (activeTab === 'users' || activeTab === 'management')) {
+      setActiveTab('files')
+    }
+  }, [user, loading, users, activeTab])
 
   async function fetchUsers() {
     const { data, error } = await supabase
