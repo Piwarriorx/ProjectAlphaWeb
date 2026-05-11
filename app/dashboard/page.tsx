@@ -48,8 +48,10 @@ export default function DashboardPage() {
   const [configMessage, setConfigMessage] = useState('')
   const [savingConfig, setSavingConfig] = useState(false)
   const [managementMessage, setManagementMessage] = useState('')
-  const [availableGroups, setAvailableGroups] = useState<string[]>([])
   const [updatingGroup, setUpdatingGroup] = useState<number | null>(null)
+  
+  // Predefined groups
+  const predefinedGroups = ['not set', '1', '2', '3', '4', '5']
   const supabase = createClient()
 
   useEffect(() => {
@@ -89,7 +91,6 @@ export default function DashboardPage() {
 
     fetchUsers()
     fetchFiles()
-    fetchAvailableGroups()
     
     // Try different possible ID field names like in handleSaveConfig
     let userId = userData.id || userData.user_id || userData.userId
@@ -243,36 +244,16 @@ export default function DashboardPage() {
     setSavingConfig(false)
   }
 
-  async function fetchAvailableGroups() {
-    const { groups, error } = await getAvailableGroups()
-    if (!error) {
-      setAvailableGroups(groups)
-    }
-  }
-
   async function handleUpdateGroup(userId: number, newGroupId: string) {
     setUpdatingGroup(userId)
     setManagementMessage('')
     
-    let finalGroupId = newGroupId
-    
-    // Handle new group creation
-    if (newGroupId === '__new__') {
-      const groupName = prompt('Enter new group name:')
-      if (!groupName || groupName.trim() === '') {
-        setUpdatingGroup(null)
-        return
-      }
-      finalGroupId = groupName.trim()
-    }
-    
-    const result = await updateUserGroup(userId, finalGroupId === '' ? null : finalGroupId)
+    const result = await updateUserGroup(userId, newGroupId === 'not set' ? null : newGroupId)
     if (result.error) {
       setManagementMessage(result.error)
     } else {
       setManagementMessage('User group updated successfully!')
       fetchUsers()
-      fetchAvailableGroups()
     }
     
     setUpdatingGroup(null)
@@ -968,23 +949,8 @@ export default function DashboardPage() {
                       </span>
                     </div>
                     <div>
-                      <span style={{
-                        padding: '4px 10px',
-                        borderRadius: '6px',
-                        fontSize: '11px',
-                        fontWeight: 600,
-                        background: u.group_id ? 'rgba(147, 51, 234, 0.15)' : 'rgba(90, 96, 114, 0.15)',
-                        color: u.group_id ? '#9333ea' : '#5a6072',
-                      }}>
-                        {u.group_id || 'No Group'}
-                      </span>
-                    </div>
-                    <div style={{ color: '#5a6072', fontSize: '13px' }}>
-                      {new Date(u.created_at).toLocaleDateString()}
-                    </div>
-                    <div>
                       <select
-                        value={u.group_id || ''}
+                        value={u.group_id || 'not set'}
                         onChange={(e) => handleUpdateGroup(u.id, e.target.value)}
                         disabled={updatingGroup === u.id}
                         style={{
@@ -998,12 +964,25 @@ export default function DashboardPage() {
                           opacity: updatingGroup === u.id ? 0.6 : 1,
                         }}
                       >
-                        <option value="">No Group</option>
-                        {availableGroups.map(group => (
+                        {predefinedGroups.map(group => (
                           <option key={group} value={group}>{group}</option>
                         ))}
-                        <option value="__new__">+ New Group</option>
                       </select>
+                    </div>
+                    <div style={{ color: '#5a6072', fontSize: '13px' }}>
+                      {new Date(u.created_at).toLocaleDateString()}
+                    </div>
+                    <div>
+                      <span style={{
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        background: u.group_id && u.group_id !== 'not set' ? 'rgba(147, 51, 234, 0.15)' : 'rgba(90, 96, 114, 0.15)',
+                        color: u.group_id && u.group_id !== 'not set' ? '#9333ea' : '#5a6072',
+                      }}>
+                        {u.group_id && u.group_id !== 'not set' ? u.group_id : 'not set'}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -1028,13 +1007,13 @@ export default function DashboardPage() {
                   <div>
                     <div style={{ color: '#5a6072', fontSize: '12px', marginBottom: '4px' }}>Users in Groups</div>
                     <div style={{ color: '#00ff88', fontSize: '20px', fontWeight: 600 }}>
-                      {users.filter(u => u.role !== 'pending' && u.group_id).length}
+                      {users.filter(u => u.role !== 'pending' && u.group_id && u.group_id !== 'not set').length}
                     </div>
                   </div>
                   <div>
                     <div style={{ color: '#5a6072', fontSize: '12px', marginBottom: '4px' }}>Total Groups</div>
                     <div style={{ color: '#9333ea', fontSize: '20px', fontWeight: 600 }}>
-                      {availableGroups.length}
+                      {predefinedGroups.length - 1}
                     </div>
                   </div>
                 </div>
