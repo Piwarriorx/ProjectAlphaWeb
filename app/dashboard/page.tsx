@@ -322,9 +322,12 @@ export default function DashboardPage() {
               maxWidth: '520px',
             }}>
               {(() => {
-                const myGroup = user.group_id || 'not set'
+                const userId = typeof user.id === 'string' ? parseInt(user.id, 10) : user.id
+                const dbUser = users.find(u => u.id === userId)
+                const myGroupRaw = dbUser?.group_id ?? user.group_id ?? 'not set'
+                const myGroup = String(myGroupRaw)
                 const sameGroup = users
-                  .filter(u => (u.group_id || 'not set') === myGroup)
+                  .filter(u => String(u.group_id || 'not set') === myGroup)
                   .filter(u => u.role !== 'pending')
                   .sort((a, b) => a.username.localeCompare(b.username))
 
