@@ -1708,6 +1708,70 @@ useEffect(() => {
 
         {/* Admin - Group Tab */}
         {user.role === 'admin' && activeTab === 'group' && (
+<div key={group.id} style={{
+  display: 'grid',
+  gridTemplateColumns: '1fr 1.2fr 1.2fr 1fr 2fr 1.5fr', // Added extra column for editor
+  padding: '16px 24px',
+  borderBottom: '1px solid rgba(255,255,255,0.05)',
+  alignItems: 'center',
+}}>
+  <div style={{ color: '#fff', fontWeight: 600 }}>{group.group_id}</div>
+  <div style={{ color: '#8b92a8', fontSize: '13px' }}>{formatDateTime(group.servertime)}</div>
+  <div style={{ color: '#8b92a8', fontSize: '13px' }}>{formatDateTime(group.expiretime)}</div>
+  <div>
+    <span style={{
+      display: 'inline-flex',
+      padding: '4px 10px',
+      borderRadius: '999px',
+      fontSize: '11px',
+      fontWeight: 700,
+      textTransform: 'uppercase',
+      background: new Date(group.expiretime).getTime() <= Date.now()
+        ? 'rgba(255, 68, 68, 0.12)'
+        : 'rgba(0, 255, 136, 0.12)',
+      color: new Date(group.expiretime).getTime() <= Date.now()
+        ? '#ff4444'
+        : '#00ff88',
+    }}>
+      {formatRemainingTime(group.expiretime)}
+    </span>
+  </div>
+  <div style={{ color: '#fff', fontSize: '12px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+    {users.filter(u => String(u.group_id || 'not set') === group.group_id)
+      .map(u => (
+        <span key={u.id} style={{
+          background: 'rgba(10,12,21,0.5)',
+          padding: '2px 6px',
+          borderRadius: '6px',
+        }}>{u.username}</span>
+      ))
+    }
+  </div>
+
+  {/* Expiration Editor */}
+  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+    <input type="number" placeholder="Days" min={0} style={{ width: '50px' }} id={`days-${group.id}`} />
+    <input type="number" placeholder="Hrs" min={0} max={23} style={{ width: '40px' }} id={`hours-${group.id}`} />
+    <input type="number" placeholder="Min" min={0} max={59} style={{ width: '40px' }} id={`minutes-${group.id}`} />
+    <input type="number" placeholder="Sec" min={0} max={59} style={{ width: '40px' }} id={`seconds-${group.id}`} />
+    <button
+      onClick={() => handleUpdateGroupExpiration(group.id)}
+      style={{
+        padding: '6px 12px',
+        background: '#00ff88',
+        color: '#0a0c15',
+        border: 'none',
+        borderRadius: '6px',
+        cursor: 'pointer',
+        fontSize: '12px',
+        fontWeight: 600,
+      }}
+    >
+      Save
+    </button>
+  </div>
+</div>
+
           <div>
             <div style={{
               background: 'rgba(20, 22, 35, 0.7)',
