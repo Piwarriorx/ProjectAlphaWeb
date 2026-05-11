@@ -4,6 +4,17 @@ import { createServerSupabase } from '@/lib/supabase/server'
 
 export async function saveUserConfig(userId: number, configText: string) {
   try {
+    // Validate inputs
+    if (!userId || userId === null || userId === undefined) {
+      console.error('Invalid userId:', userId)
+      return { error: 'Invalid user ID. Please log in again.' }
+    }
+
+    if (configText === null || configText === undefined) {
+      console.error('Invalid configText:', configText)
+      return { error: 'Invalid configuration text.' }
+    }
+
     const supabase = await createServerSupabase()
 
     console.log('Attempting to save config for user:', userId)
@@ -41,6 +52,12 @@ export async function saveUserConfig(userId: number, configText: string) {
 
 export async function getUserConfig(userId: number) {
   try {
+    // Validate input
+    if (!userId || userId === null || userId === undefined) {
+      console.error('Invalid userId in getUserConfig:', userId)
+      return { configText: '', error: 'Invalid user ID. Please log in again.' }
+    }
+
     const supabase = await createServerSupabase()
 
     console.log('Attempting to get config for user:', userId)
