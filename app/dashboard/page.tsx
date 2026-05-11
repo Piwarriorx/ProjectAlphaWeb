@@ -641,9 +641,9 @@ useEffect(() => {
   if (!launchUrl) {
     launchLabel = 'Launch unavailable'
   } else if (isGroupExpired) {
-    launchLabel = 'Expired'
+    launchLabel = 'Launch unavailable'
   } else if (!hasApprovedHwid) {
-    launchLabel = 'HWID pending approval'
+    launchLabel = 'Launch unavailable'
   } else {
     launchLabel = 'Launch'
   }
