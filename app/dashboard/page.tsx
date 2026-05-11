@@ -323,7 +323,7 @@ export default function DashboardPage() {
               Welcome, {user.role.charAt(0).toUpperCase() + user.role.slice(1)} {user.username}!
             </p>
             <div style={{ color: '#fff', fontSize: '20px', fontFamily: 'monospace', fontWeight: 600, letterSpacing: '2px', marginTop: '6px' }}>
-              {time} <span style={{ fontSize: '11px', color: '#5a6072', fontWeight: 400, letterSpacing: '1px' }}>PHT</span>
+              Server Time: {time} <span style={{ fontSize: '11px', color: '#5a6072', fontWeight: 400, letterSpacing: '1px' }}>PHT</span>
             </div>
 
             {/* Users in the same group */}
