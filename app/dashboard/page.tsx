@@ -101,8 +101,18 @@ export default function DashboardPage() {
   }
 
   async function fetchUserConfig(userId: number) {
+    if (!userId || userId === null || userId === undefined) {
+      console.error('Invalid userId in fetchUserConfig:', userId)
+      return
+    }
+    
+    console.log('Fetching config for user ID:', userId)
     const { configText, error } = await getUserConfig(userId)
-    if (!error) setConfigText(configText)
+    if (!error) {
+      setConfigText(configText)
+    } else {
+      console.error('Error fetching user config:', error)
+    }
   }
 
   async function handleApprove(id: number) {
@@ -158,9 +168,19 @@ export default function DashboardPage() {
   }
 
   async function handleSaveConfig() {
-    if (!user) return
+    if (!user) {
+      setConfigMessage('User not found. Please log in again.')
+      return
+    }
+    
+    if (!user.id || user.id === null || user.id === undefined) {
+      setConfigMessage('Invalid user ID. Please log in again.')
+      return
+    }
+    
     setSavingConfig(true)
     setConfigMessage('')
+    console.log('Saving config for user ID:', user.id, 'user object:', user)
     
     const result = await saveUserConfig(user.id, configText)
     if (result.error) {
