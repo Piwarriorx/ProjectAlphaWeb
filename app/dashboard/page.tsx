@@ -796,7 +796,7 @@ useEffect(() => {
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center' }}>
             <button
               onClick={() => {
                 if (!canLaunch) return
@@ -804,7 +804,7 @@ useEffect(() => {
               }}
               disabled={!canLaunch}
               style={{
-                minWidth: '180px',
+                minWidth: '200px',
                 padding: '12px 24px',
                 background: canLaunch ? 'rgba(0, 255, 136, 0.12)' : 'rgba(58, 61, 78, 0.5)',
                 color: canLaunch ? '#00ff88' : '#5a6072',
@@ -816,6 +816,10 @@ useEffect(() => {
                 letterSpacing: '0.8px',
                 textTransform: 'uppercase',
                 transition: 'all 0.25s ease',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '4px',
               }}
               onMouseEnter={(e) => {
                 if (!canLaunch) return
@@ -828,7 +832,19 @@ useEffect(() => {
                 e.currentTarget.style.borderColor = 'rgba(0, 255, 136, 0.35)'
               }}
             >
-              {launchLabel}
+              <span>{launchLabel}</span>
+              {userGroupId && userGroupId !== 'not set' && userGroupExpiration && (
+                <span style={{
+                  fontSize: '10px',
+                  fontWeight: 600,
+                  fontFamily: 'monospace',
+                  letterSpacing: '0.5px',
+                  color: isGroupExpired ? '#ff4444' : '#00ff88',
+                  opacity: 0.85,
+                }}>
+                  {isGroupExpired ? 'EXPIRED' : formatRemainingTime(userGroupExpiration.expiretime)}
+                </span>
+              )}
             </button>
           </div>
 
