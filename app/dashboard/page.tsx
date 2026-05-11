@@ -819,7 +819,7 @@ export default function DashboardPage() {
                 <textarea
                   value={configText}
                   onChange={(e) => setConfigText(e.target.value)}
-                  placeholder="Enter your configuration settings here..."
+                  placeholder="Enter your import key here..."
                   style={{
                     width: '100%',
                     height: '300px',
