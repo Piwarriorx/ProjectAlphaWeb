@@ -545,32 +545,50 @@ useEffect(() => {
   async function handleSaveExpiration() {
     if (!editingGroupId) return
     setBulkProcessing(true)
+    setManagementMessage('')
 
-    const d = parseInt(expDays) || 0
-    const h = parseInt(expHours) || 0
-    const m = parseInt(expMinutes) || 0
-    const s = parseInt(expSeconds) || 0
-    const totalSeconds = (d * 86400) + (h * 3600) + (m * 60) + s
+    try {
+      const d = parseInt(expDays) || 0
+      const h = parseInt(expHours) || 0
+      const m = parseInt(expMinutes) || 0
+      const s = parseInt(expSeconds) || 0
+      const totalSeconds = (d * 86400) + (h * 3600) + (m * 60) + s
 
-    const now = new Date()
-    const expireDate = new Date(now.getTime() + totalSeconds * 1000)
+      if (totalSeconds <= 0) {
+        setManagementMessage('Please set an expiration time greater than 0')
+        setBulkProcessing(false)
+        return
+      }
 
-    console.log('Attempting to save expiration for group:', editingGroupId, 'Expire Time:', expireDate.toISOString());
-    const result = await updateGroupExpiration(
-      editingGroupId,
-      expireDate.toISOString()
-    )
-    console.log('Result from updateGroupExpiration server action:', result);
+      const now = new Date()
+      const expireDate = new Date(now.getTime() + totalSeconds * 1000)
 
-    if (result.error) {
-      setManagementMessage(result.error)
-    } else {
-      setManagementMessage(`Successfully updated expiration for Group ${editingGroupId}`)
-      fetchGroupExpirations()
-      setIsExpModalOpen(false)
+      console.log('Attempting to save expiration for group:', editingGroupId, 'Expire Time:', expireDate.toISOString());
+      const result = await updateGroupExpiration(
+        editingGroupId,
+        expireDate.toISOString()
+      )
+      console.log('Result from updateGroupExpiration server action:', result);
+
+      if (result.error) {
+        setManagementMessage(result.error)
+      } else {
+        setManagementMessage(`Successfully updated expiration for Group ${editingGroupId}`)
+        await fetchGroupExpirations()
+        setIsExpModalOpen(false)
+        // Reset form inputs
+        setExpDays('0')
+        setExpHours('0')
+        setExpMinutes('0')
+        setExpSeconds('0')
+      }
+    } catch (err: any) {
+      console.error('Error in handleSaveExpiration:', err)
+      setManagementMessage(err?.message || 'Failed to save expiration')
+    } finally {
+      setBulkProcessing(false)
+      setTimeout(() => setManagementMessage(''), 3000)
     }
-    setBulkProcessing(false)
-    setTimeout(() => setManagementMessage(''), 3000)
   }
 
   function logout() {

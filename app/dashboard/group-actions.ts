@@ -105,15 +105,20 @@ export async function updateGroupExpiration(groupId: string, expiretime: string)
 
   console.log('Calling update_group_expiration RPC with:', { p_group_id: groupId, p_expiretime: expiretime });
 
-  const { error } = await supabase.rpc('update_group_expiration', {
-    p_group_id: groupId,
-    p_expiretime: expiretime
-  })
+  try {
+    const { data, error } = await supabase.rpc('update_group_expiration', {
+      p_group_id: groupId,
+      p_expiretime: expiretime
+    })
 
-  if (error) {
-    console.error('Error from update_group_expiration RPC:', error.message);
-    return { error: error.message };
+    if (error) {
+      console.error('Error from update_group_expiration RPC:', error.message, error.details, error.hint);
+      return { error: error.message };
+    }
+    console.log('Successfully called update_group_expiration RPC. Data:', data);
+    return { success: true, data };
+  } catch (err: any) {
+    console.error('Exception in updateGroupExpiration:', err);
+    return { error: err?.message || 'Unknown error occurred' };
   }
-  console.log('Successfully called update_group_expiration RPC.');
-  return { success: true };
 }

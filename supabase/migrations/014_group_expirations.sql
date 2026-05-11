@@ -25,6 +25,10 @@ CREATE POLICY "Allow service role full access to group expirations" ON public.gr
     OR current_user LIKE 'service_role%'
   );
 
+-- Additional policy for authenticated users via RPC (SECURITY DEFINER bypasses RLS but we need this for direct access too)
+CREATE POLICY "Allow authenticated users to manage group expirations" ON public.group_expirations
+  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+
 CREATE OR REPLACE FUNCTION public.update_group_expiration(p_group_id TEXT, p_expiretime TIMESTAMPTZ)
 RETURNS VOID
 LANGUAGE plpgsql
