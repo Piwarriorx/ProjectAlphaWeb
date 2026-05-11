@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { approveUser, rejectUser } from './actions'
 import { uploadFile, listFiles, deleteFile, getSignedDownloadUrl } from './file-actions'
 import { saveUserConfig, getUserConfig } from './config-actions'
-import { updateUserGroup, getUsersWithGroups, getAvailableGroups, updateUserRole } from './group-actions'
+import { updateUserGroup, updateUserRole } from './group-actions'
 
 interface User {
   id: number
@@ -16,6 +16,12 @@ interface User {
   created_at: string
   last_login_at?: string | null
   group_id?: string | null
+  hwid?: string | null
+}
+
+interface LaunchCredential {
+  token: string
+  version: string
 }
 
 interface FileRecord {
@@ -56,6 +62,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [time, setTime] = useState('')
   const [activeTab, setActiveTab] = useState<'users' | 'files' | 'config' | 'management'>('files')
+  const [launchData, setLaunchData] = useState<LaunchCredential | null>(null)
   const [uploadMessage, setUploadMessage] = useState('')
   const [uploading, setUploading] = useState(false)
   const [configText, setConfigText] = useState('')
@@ -121,16 +128,37 @@ export default function DashboardPage() {
     } else {
       console.error('User data or ID is missing/invalid:', userData, 'Extracted ID:', userId)
     }
+
+    fetchLaunchData()
   }, [])
 
   async function fetchUsers() {
     const { data, error } = await supabase
       .from('users')
-      .select('id, username, role, created_at, last_login_at, group_id')
+      .select('id, username, role, created_at, last_login_at, group_id, hwid')
       .order('created_at', { ascending: false })
 
     setUsers(data || [])
     setLoading(false)
+  }
+
+  async function fetchLaunchData() {
+    const { data, error } = await supabase
+      .from('user_launch_credentials')
+      .select('token, version')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (error) {
+      if (error.code !== 'PGRST116') {
+        console.error('Error fetching launch data:', error)
+      }
+      setLaunchData(null)
+      return
+    }
+
+    setLaunchData(data)
   }
 
   async function fetchFiles() {
@@ -299,6 +327,15 @@ export default function DashboardPage() {
     window.location.href = '/login'
   }
 
+  const currentUserId = getUserId(user)
+  const currentUserRow = currentUserId ? users.find(u => u.id === currentUserId) : null
+  const currentHwid = currentUserRow?.hwid?.trim() || ''
+  const launchUrl =
+    launchData && currentHwid
+      ? `ezcrosshairalpha://launch?token=${encodeURIComponent(launchData.token)}&hw=${encodeURIComponent(currentHwid)}&ver=${encodeURIComponent(launchData.version)}`
+      : ''
+  const canLaunch = Boolean(launchUrl)
+
   if (!user) return null
   if (loading) return <div style={{ color: '#fff', padding: 32 }}>Loading...</div>
 
@@ -308,14 +345,15 @@ export default function DashboardPage() {
 
         {/* Header */}
         <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)',
           alignItems: 'center',
+          gap: '24px',
           marginBottom: '32px',
           paddingBottom: '24px',
           borderBottom: '1px solid rgba(255,255,255,0.1)'
         }}>
-          <div>
+          <div style={{ minWidth: 0 }}>
             <h1 style={{ color: '#fff', fontSize: '32px', fontWeight: 700 }}>
               ProjectAlpha
             </h1>
@@ -376,9 +414,46 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <button
+              onClick={() => {
+                if (!canLaunch) return
+                window.location.href = launchUrl
+              }}
+              disabled={!canLaunch}
+              style={{
+                minWidth: '180px',
+                padding: '12px 24px',
+                background: canLaunch ? 'rgba(0, 255, 136, 0.12)' : 'rgba(58, 61, 78, 0.5)',
+                color: canLaunch ? '#00ff88' : '#5a6072',
+                border: `1.5px solid ${canLaunch ? 'rgba(0, 255, 136, 0.35)' : 'rgba(90, 96, 114, 0.35)'}`,
+                borderRadius: '10px',
+                cursor: canLaunch ? 'pointer' : 'not-allowed',
+                fontSize: '13px',
+                fontWeight: 700,
+                letterSpacing: '0.8px',
+                textTransform: 'uppercase',
+                transition: 'all 0.25s ease',
+              }}
+              onMouseEnter={(e) => {
+                if (!canLaunch) return
+                e.currentTarget.style.background = 'rgba(0, 255, 136, 0.18)'
+                e.currentTarget.style.borderColor = 'rgba(0, 255, 136, 0.55)'
+              }}
+              onMouseLeave={(e) => {
+                if (!canLaunch) return
+                e.currentTarget.style.background = 'rgba(0, 255, 136, 0.12)'
+                e.currentTarget.style.borderColor = 'rgba(0, 255, 136, 0.35)'
+              }}
+            >
+              {canLaunch ? 'Launch' : 'Launch unavailable'}
+            </button>
+          </div>
+
           <button
             onClick={logout}
             style={{
+              justifySelf: 'end',
               padding: '10px 22px',
               background: 'transparent',
               color: '#ff6b6b',
@@ -987,7 +1062,7 @@ export default function DashboardPage() {
               }}>
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: '1fr 120px 150px',
+                  gridTemplateColumns: '1fr 120px minmax(180px, 240px) 150px',
                   padding: '16px 24px',
                   background: 'rgba(0, 0, 0, 0.3)',
                   borderBottom: '1px solid rgba(255,255,255,0.05)',
@@ -999,6 +1074,7 @@ export default function DashboardPage() {
                 }}>
                   <div>Username</div>
                   <div>Role</div>
+                  <div>HWID</div>
                   <div>Group ID</div>
                 </div>
 
@@ -1013,7 +1089,7 @@ export default function DashboardPage() {
                   .map(u => (
                   <div key={u.id} style={{
                     display: 'grid',
-                    gridTemplateColumns: '1fr 120px 150px',
+                    gridTemplateColumns: '1fr 120px minmax(180px, 240px) 150px',
                     padding: '16px 24px',
                     borderBottom: '1px solid rgba(255,255,255,0.05)',
                     alignItems: 'center',
@@ -1057,6 +1133,21 @@ export default function DashboardPage() {
                           <option value="pending">pending</option>
                         </select>
                       )}
+                    </div>
+                    <div>
+                      <div
+                        title={u.hwid || 'not set'}
+                        style={{
+                          color: u.hwid ? '#fff' : '#5a6072',
+                          fontSize: '12px',
+                          fontFamily: 'monospace',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {u.hwid || 'not set'}
+                      </div>
                     </div>
                     <div>
                       <select

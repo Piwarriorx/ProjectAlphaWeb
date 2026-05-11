@@ -10,8 +10,9 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 1. Create a new Supabase project at [https://supabase.com](https://supabase.com).
 2. Copy your **Project URL** and **anon key** from Project Settings > API.
 3. Create `.env.local` in the project root (see `ENVIRONMENT.md` for the format).
-4. Open the Supabase SQL Editor and run the migration in `supabase/migrations/001_initial_schema.sql`.
-5. Log in with the default admin account (`admin` / `admin123`).
+4. Open the Supabase SQL Editor and run `supabase/migrations/001_initial_schema.sql`.
+5. Run the rest of the migrations in order, through `supabase/migrations/009_add_hwid_and_launch_credentials.sql`.
+6. Log in with the default admin account (`admin` / `admin123`).
 
 See [`SUPABASE_SETUP.md`](./SUPABASE_SETUP.md) for full instructions.
 

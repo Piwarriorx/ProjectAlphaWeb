@@ -64,6 +64,11 @@ After creating the bucket, run these additional migrations in the SQL Editor:
 - `supabase/migrations/002_fix_rls_for_registration.sql`
 - `supabase/migrations/003_admin_actions.sql`
 - `supabase/migrations/004_files_table.sql`
+- `supabase/migrations/005_add_last_login.sql`
+- `supabase/migrations/006_user_config.sql`
+- `supabase/migrations/007_update_user_management.sql`
+- `supabase/migrations/008_add_group_id_to_users.sql`
+- `supabase/migrations/009_add_hwid_and_launch_credentials.sql`
 
 ## 7. Register New Users
 
@@ -82,6 +87,8 @@ Anyone can register via the `/login` page. New accounts start with the `pending`
 | `password_hash`| `text`      | Bcrypt-hashed password                   |
 | `role`         | `text`      | `pending`, `user`, or `admin`            |
 | `created_at`   | `timestamptz`| Account creation timestamp               |
+| `group_id`     | `text`      | Optional user group                       |
+| `hwid`         | `text`      | Hardware ID for launch URL               |
 
 ### RPC Functions
 
@@ -89,3 +96,16 @@ Anyone can register via the `/login` page. New accounts start with the `pending`
 |-----------------|----------------------------------------------|
 | `hash_password` | Hashes a plaintext password with bcrypt      |
 | `login_user`    | Verifies credentials and returns user info   |
+
+### `public.user_launch_credentials`
+
+Stores the latest global launch credentials used by the dashboard.
+
+| Column      | Type         | Description                               |
+|-------------|--------------|-------------------------------------------|
+| `token`     | `text`       | Token used in the custom launch URL       |
+| `version`   | `text`       | Version passed to the launcher            |
+| `created_at`| `timestamptz`| Row creation timestamp                    |
+| `updated_at`| `timestamptz`| Row update timestamp                      |
+
+Insert at least one row here so the Launch button can build a URL.

@@ -21,7 +21,7 @@ export async function getUsersWithGroups() {
 
   const { data, error } = await supabase
     .from('users')
-    .select('id, username, role, group_id, created_at, last_login_at')
+    .select('id, username, role, group_id, hwid, created_at, last_login_at')
     .order('created_at', { ascending: false })
 
   if (error) return { users: [], error: error.message }
