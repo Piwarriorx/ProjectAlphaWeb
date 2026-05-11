@@ -196,6 +196,12 @@ export default function DashboardPage() {
     const currentUserRow = users.find(u => u.id === currentUserId)
     if (currentUserRow === undefined) return
 
+    // Redirect pending users back to login
+  if (currentUserRow.role === 'pending' && window.location.pathname !== '/login') {
+    window.location.href = '/login'
+    return
+  }
+
     if (currentUserRow.role !== 'admin' && currentUserRow.hwid_approved !== true && window.location.pathname !== '/hwid') {
       window.location.href = '/hwid'
     }
@@ -722,18 +728,21 @@ useEffect(() => {
       : ''
 
   // Disable launch if group is expired
-  const canLaunch = Boolean(launchUrl) && hasApprovedHwid && !isGroupExpired
+  const isPending = user?.role === 'pending'
+const canLaunch = Boolean(launchUrl) && hasApprovedHwid && !isGroupExpired && !isPending
 
-  let launchLabel: string
-  if (!launchUrl) {
-    launchLabel = 'Launch unavailable'
-  } else if (isGroupExpired) {
-    launchLabel = 'Launch unavailable'
-  } else if (!hasApprovedHwid) {
-    launchLabel = 'Launch unavailable'
-  } else {
-    launchLabel = 'Launch'
-  }
+let launchLabel: string
+if (isPending) {
+  launchLabel = 'Pending approval'
+} else if (!launchUrl) {
+  launchLabel = 'Launch unavailable'
+} else if (isGroupExpired) {
+  launchLabel = 'Launch unavailable'
+} else if (!hasApprovedHwid) {
+  launchLabel = 'Launch unavailable'
+} else {
+  launchLabel = 'Launch'
+}
   const manageableUsers = users
     .filter(u => u.role !== 'pending')
     .sort((a, b) => {
