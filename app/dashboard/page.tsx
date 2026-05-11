@@ -176,31 +176,41 @@ export default function DashboardPage() {
   async function handleSaveConfig() {
     console.log('handleSaveConfig called, user object:', user)
     
-    if (!user) {
-      setConfigMessage('User not found. Please log in again.')
+    // Get user data directly from localStorage to bypass any state issues
+    const session = localStorage.getItem('ezcrosshair_user')
+    if (!session) {
+      setConfigMessage('No session found. Please log in again.')
+      return
+    }
+
+    let userData
+    try {
+      userData = JSON.parse(session)
+      console.log('Raw user data from localStorage:', userData)
+    } catch (e) {
+      console.error('Failed to parse user data:', e)
+      setConfigMessage('Invalid session data. Please log in again.')
       return
     }
     
-    console.log('User ID:', user.id, 'Type:', typeof user.id, 'Value:', user.id)
+    // Try different possible ID field names
+    let userId = userData.id || userData.user_id || userData.userId
+    console.log('Extracted userId:', userId, 'Type:', typeof userId)
     
-    // Handle different ID formats (string, number, etc.)
-    let userId = user.id
+    // Convert to number if it's a string
     if (typeof userId === 'string') {
       userId = parseInt(userId, 10)
-      if (isNaN(userId)) {
-        setConfigMessage('Invalid user ID format. Please log in again.')
-        return
-      }
     }
     
-    if (!userId || userId === null || userId === undefined || userId === 0) {
-      setConfigMessage('Invalid user ID. Please log in again.')
+    if (!userId || isNaN(userId) || userId === 0) {
+      console.error('Invalid userId after extraction:', userId)
+      setConfigMessage(`Invalid user ID: ${userId}. Please log in again.`)
       return
     }
     
     setSavingConfig(true)
     setConfigMessage('')
-    console.log('Saving config for processed user ID:', userId, 'original user object:', user)
+    console.log('Attempting to save config with userId:', userId)
     
     const result = await saveUserConfig(userId, configText)
     if (result.error) {
