@@ -6,15 +6,10 @@ export async function saveUserConfig(userId: number, configText: string) {
   const supabase = await createServerSupabase()
 
   try {
-    // Direct upsert operation
     const { error } = await supabase
-      .from('user_configs')
-      .upsert({ 
-        user_id: userId, 
-        config_text: configText,
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'user_id'
+      .rpc('save_user_config', {
+        p_user_id: userId,
+        p_config_text: configText
       })
 
     if (error) {
@@ -34,17 +29,21 @@ export async function getUserConfig(userId: number) {
 
   try {
     const { data, error } = await supabase
-      .from('user_configs')
-      .select('config_text')
-      .eq('user_id', userId)
-      .maybeSingle() // Use maybeSingle to avoid "no rows" error
+      .rpc('get_user_config', {
+        p_user_id: userId
+      })
 
     if (error) {
       console.error('Get error:', error)
       return { configText: '', error: error.message }
     }
 
-    return { configText: data?.config_text || '', error: null }
+    // Handle both array and single value responses
+    const configText = Array.isArray(data) && data.length > 0 
+      ? data[0].config_text 
+      : data?.config_text || '';
+    
+    return { configText, error: null }
   } catch (err) {
     console.error('Unexpected error:', err)
     return { configText: '', error: 'An unexpected error occurred' }
