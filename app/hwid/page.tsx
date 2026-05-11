@@ -36,6 +36,11 @@ export default function HwidPage() {
       return
     }
 
+    if (!user) {
+      window.location.href = '/login'
+      return
+    }
+
     const rawId = user.id ?? user.userId ?? user.user_id
     const parsedId = typeof rawId === 'string' ? parseInt(rawId, 10) : rawId
     if (!parsedId || Number.isNaN(parsedId)) {
