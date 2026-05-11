@@ -202,7 +202,7 @@ export default function DashboardPage() {
 
   }, [user, loading, users])
 
-  useEffect(() => {
+    useEffect(() => {
     if (user?.role !== 'admin') return
 
     const channel = supabase
@@ -231,6 +231,25 @@ export default function DashboardPage() {
       supabase.removeChannel(channel)
     }
   }, [user])
+
+  // Realtime listener for group_expirations changes (for all users)
+  useEffect(() => {
+    const channel = supabase
+      .channel('group-expirations-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'group_expirations' },
+        (payload) => {
+          console.log('Group expiration changed:', payload)
+          fetchGroupExpirations()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
 
   async function fetchUsers() {
     const { data, error } = await supabase
