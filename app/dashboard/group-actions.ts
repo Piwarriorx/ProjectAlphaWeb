@@ -48,11 +48,7 @@ export async function updateUserHwidApproval(userId: number, approved: boolean) 
 
   console.log('HWID approval update result:', { data, error })
 
-  if (error) return { error: error.message }
-  return { success: true, data }
-}
-
-export async function bulkUpdateUserRole(userIds: number[], role: string) {
+  if (error) return { error: erexport async function bulkUpdateUserRole(userIds: number[], role: string) {
   const supabase = await createServerSupabase()
 
   for (const userId of userIds) {
@@ -85,6 +81,10 @@ export async function bulkDeleteUsers(userIds: number[]) {
   return { success: true }
 }
 
+ror.message }
+  return { success: true, data }
+}
+
 export async function getAvailableGroups() {
   const supabase = await createServerSupabase()
 
@@ -98,28 +98,4 @@ export async function getAvailableGroups() {
   // Extract unique group IDs
   const uniqueGroups = [...new Set(data?.map(u => u.group_id).filter(Boolean))]
   return { groups: uniqueGroups, error: null }
-}
-
-async function handleUpdateGroupExpiration(groupId: number) {
-  const days = parseInt((document.getElementById(`days-${groupId}`) as HTMLInputElement).value) || 0
-  const hours = parseInt((document.getElementById(`hours-${groupId}`) as HTMLInputElement).value) || 0
-  const minutes = parseInt((document.getElementById(`minutes-${groupId}`) as HTMLInputElement).value) || 0
-  const seconds = parseInt((document.getElementById(`seconds-${groupId}`) as HTMLInputElement).value) || 0
-
-  const now = new Date()
-  const expire = new Date(now.getTime() +
-    days * 86400000 +
-    hours * 3600000 +
-    minutes * 60000 +
-    seconds * 1000
-  )
-
-  const { error } = await supabase
-    .from('group_expirations')
-    .update({ servertime: now.toISOString(), expiretime: expire.toISOString() })
-    .eq('id', groupId)
-
-  if (error) return alert(`Error updating expiration: ${error.message}`)
-  alert('Group expiration updated!')
-  fetchGroupExpirations()
 }
