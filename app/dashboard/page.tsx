@@ -596,20 +596,38 @@ useEffect(() => {
     window.location.href = '/login'
   }
 
-  const currentUserId = getUserId(user)
+    const currentUserId = getUserId(user)
   const currentUserRow = currentUserId ? users.find(u => u.id === currentUserId) : null
   const currentHwid = currentUserRow?.hwid?.trim() || ''
   const hasApprovedHwid = currentUserRow?.role === 'admin' || currentUserRow?.hwid_approved === true
+
+  // Get user's group and check expiration
+  const userGroupId = currentUserRow?.group_id || user?.group_id || null
+  const userGroupExpiration = userGroupId
+    ? groupExpirations.find(ge => ge.group_id === String(userGroupId))
+    : null
+  const isGroupExpired = userGroupExpiration
+    ? new Date(userGroupExpiration.expiretime).getTime() <= Date.now()
+    : false
+
   const launchUrl =
     launchData && currentHwid
       ? `ezcrosshairalpha://launch?token=${encodeURIComponent(launchData.token)}&hw=${encodeURIComponent(currentHwid)}&ver=${encodeURIComponent(launchData.version)}`
       : ''
-  const canLaunch = Boolean(launchUrl) && hasApprovedHwid
-  const launchLabel = !launchUrl
-    ? 'Launch unavailable'
-    : !hasApprovedHwid
-      ? 'HWID pending approval'
-      : 'Launch'
+
+  // Disable launch if group is expired
+  const canLaunch = Boolean(launchUrl) && hasApprovedHwid && !isGroupExpired
+
+  let launchLabel: string
+  if (!launchUrl) {
+    launchLabel = 'Launch unavailable'
+  } else if (isGroupExpired) {
+    launchLabel = 'Group expired'
+  } else if (!hasApprovedHwid) {
+    launchLabel = 'HWID pending approval'
+  } else {
+    launchLabel = 'Launch'
+  }
   const manageableUsers = users
     .filter(u => u.role !== 'pending')
     .sort((a, b) => {
@@ -644,10 +662,72 @@ useEffect(() => {
               Welcome, {user.role.charAt(0).toUpperCase() + user.role.slice(1)} {user.username}!
             </p>
             <div style={{ color: '#fff', fontSize: '20px', fontFamily: 'monospace', fontWeight: 600, letterSpacing: '2px', marginTop: '6px' }}>
-              Server Time: {time} <span style={{ fontSize: '11px', color: '#5a6072', fontWeight: 400, letterSpacing: '1px' }}>PHT</span>
-            </div>
+  Server Time: {time} <span style={{ fontSize: '11px', color: '#5a6072', fontWeight: 400, letterSpacing: '1px' }}>PHT</span>
+</div>
 
-            {/* Users in the same group */}
+{/* Group Expiration Display */}
+{userGroupId && userGroupId !== 'not set' && (
+  <div style={{ marginTop: '8px' }}>
+    {userGroupExpiration ? (
+      <div style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '8px',
+        padding: '6px 14px',
+        borderRadius: '8px',
+        background: isGroupExpired
+          ? 'rgba(255, 68, 68, 0.12)'
+          : 'rgba(0, 255, 136, 0.1)',
+        border: `1px solid ${isGroupExpired
+          ? 'rgba(255, 68, 68, 0.3)'
+          : 'rgba(0, 255, 136, 0.25)'}`,
+      }}>
+        <span style={{
+          width: '8px',
+          height: '8px',
+          borderRadius: '50%',
+          background: isGroupExpired ? '#ff4444' : '#00ff88',
+          display: 'inline-block',
+        }} />
+        <span style={{
+          color: isGroupExpired ? '#ff4444' : '#00ff88',
+          fontSize: '13px',
+          fontWeight: 600,
+          fontFamily: 'monospace',
+        }}>
+          Group {userGroupId} — {isGroupExpired ? 'Expired' : formatRemainingTime(userGroupExpiration.expiretime)} remaining
+        </span>
+      </div>
+    ) : (
+      <div style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '8px',
+        padding: '6px 14px',
+        borderRadius: '8px',
+        background: 'rgba(255, 149, 0, 0.1)',
+        border: '1px solid rgba(255, 149, 0, 0.25)',
+      }}>
+        <span style={{
+          width: '8px',
+          height: '8px',
+          borderRadius: '50%',
+          background: '#ff9500',
+          display: 'inline-block',
+        }} />
+        <span style={{
+          color: '#ff9500',
+          fontSize: '13px',
+          fontWeight: 600,
+        }}>
+          Group {userGroupId} — No expiration set
+        </span>
+      </div>
+    )}
+  </div>
+)}
+
+{/* Users in the same group */}
             <div style={{
               marginTop: '12px',
               display: 'flex',
