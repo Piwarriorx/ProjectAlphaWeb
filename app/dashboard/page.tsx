@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { approveUser, rejectUser } from './actions'
 import { uploadFile, listFiles, deleteFile, getSignedDownloadUrl } from './file-actions'
 import { saveUserConfig, getUserConfig } from './config-actions'
-import { updateUserGroup, getUsersWithGroups, getAvailableGroups } from './group-actions'
+import { updateUserGroup, getUsersWithGroups, getAvailableGroups, updateUserRole } from './group-actions'
 
 interface User {
   id: number
@@ -253,6 +253,24 @@ export default function DashboardPage() {
       setManagementMessage(result.error)
     } else {
       setManagementMessage('User group updated successfully!')
+      fetchUsers()
+    }
+    
+    setUpdatingGroup(null)
+    
+    // Clear message after 3 seconds
+    setTimeout(() => setManagementMessage(''), 3000)
+  }
+
+  async function handleUpdateRole(userId: number, newRole: string) {
+    setUpdatingGroup(userId)
+    setManagementMessage('')
+    
+    const result = await updateUserRole(userId, newRole)
+    if (result.error) {
+      setManagementMessage(result.error)
+    } else {
+      setManagementMessage('User role updated successfully!')
       fetchUsers()
     }
     
@@ -920,7 +938,15 @@ export default function DashboardPage() {
                   <div>Current Group</div>
                 </div>
 
-                {users.filter(u => u.role !== 'pending').map(u => (
+                {users
+                  .filter(u => u.role !== 'pending')
+                  .sort((a, b) => {
+                    // Admin roles first
+                    if (a.role === 'admin' && b.role !== 'admin') return -1
+                    if (a.role !== 'admin' && b.role === 'admin') return 1
+                    return 0
+                  })
+                  .map(u => (
                   <div key={u.id} style={{
                     display: 'grid',
                     gridTemplateColumns: '1fr 120px 150px',
@@ -932,19 +958,40 @@ export default function DashboardPage() {
                       {u.username}
                     </div>
                     <div>
-                      <span style={{
-                        padding: '4px 10px',
-                        borderRadius: '6px',
-                        fontSize: '11px',
-                        textTransform: 'uppercase',
-                        fontWeight: 600,
-                        background: u.role === 'admin'
-                          ? 'rgba(255, 149, 0, 0.15)'
-                          : 'rgba(0, 255, 136, 0.1)',
-                        color: u.role === 'admin' ? '#ff9500' : '#00ff88',
-                      }}>
-                        {u.role}
-                      </span>
+                      {u.role === 'admin' ? (
+                        <span style={{
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          textTransform: 'uppercase',
+                          fontWeight: 600,
+                          background: 'rgba(255, 149, 0, 0.15)',
+                          color: '#ff9500',
+                        }}>
+                          {u.role}
+                        </span>
+                      ) : (
+                        <select
+                          value={u.role}
+                          onChange={(e) => handleUpdateRole(u.id, e.target.value)}
+                          disabled={updatingGroup === u.id}
+                          style={{
+                            padding: '4px 10px',
+                            background: 'rgba(10, 12, 21, 0.8)',
+                            border: '1px solid rgba(255, 255, 255, 0.2)',
+                            borderRadius: '6px',
+                            color: '#fff',
+                            fontSize: '11px',
+                            cursor: updatingGroup === u.id ? 'not-allowed' : 'pointer',
+                            opacity: updatingGroup === u.id ? 0.6 : 1,
+                            textTransform: 'uppercase',
+                            fontWeight: 600,
+                          }}
+                        >
+                          <option value="user">user</option>
+                          <option value="not set">not set</option>
+                        </select>
+                      )}
                     </div>
                     <div>
                       <select
