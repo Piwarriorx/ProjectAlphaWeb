@@ -71,6 +71,7 @@ After creating the bucket, run these additional migrations in the SQL Editor:
 - `supabase/migrations/009_add_hwid_and_launch_credentials.sql`
 - `supabase/migrations/010_add_hwid_approval.sql`
 - `supabase/migrations/011_add_update_user_hwid.sql`
+- `supabase/migrations/012_clear_hwid_on_denial.sql`
 
 ## 7. Register New Users
 

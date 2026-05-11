@@ -345,7 +345,7 @@ export default function DashboardPage() {
     if (result.error) {
       setManagementMessage(result.error)
     } else {
-      setManagementMessage(approved ? 'HWID approved successfully!' : 'HWID denied successfully!')
+      setManagementMessage(approved ? 'HWID approved successfully!' : 'HWID denied and cleared successfully!')
       fetchUsers()
     }
 

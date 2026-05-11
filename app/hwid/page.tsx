@@ -66,16 +66,63 @@ export default function HwidPage() {
       }
 
       const storedHwid = data.hwid?.trim() || ''
-      if (storedHwid && data.hwid_approved === true) {
+      if (data.hwid_approved === true) {
         window.location.href = '/dashboard'
         return
       }
 
       setHwid(storedHwid)
-      setPendingApproval(Boolean(storedHwid && data.hwid_approved !== true))
+      setPendingApproval(Boolean(storedHwid))
       setLoading(false)
     })()
   }, [])
+
+  useEffect(() => {
+    if (!userId || !pendingApproval) return
+
+    const supabase = createClient()
+    let cancelled = false
+
+    const checkApproval = async () => {
+      const { data, error } = await supabase
+        .from('users')
+        .select('hwid, hwid_approved')
+        .eq('id', userId)
+        .single()
+
+      if (cancelled) return
+
+      if (error || !data) {
+        window.location.href = '/login'
+        return
+      }
+
+      if (data.hwid_approved === true) {
+        window.location.href = '/dashboard'
+        return
+      }
+
+      const storedHwid = data.hwid?.trim() || ''
+      if (!storedHwid) {
+        setPendingApproval(false)
+        setHwid('')
+        setMessage('Your HWID was denied. Please submit a new one.')
+        return
+      }
+
+      setHwid(storedHwid)
+    }
+
+    void checkApproval()
+    const intervalId = window.setInterval(() => {
+      void checkApproval()
+    }, 5000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+    }
+  }, [userId, pendingApproval])
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -110,66 +157,81 @@ export default function HwidPage() {
               : 'Paste your HWID below.'}
         </p>
 
-        {pendingApproval && (
+        {pendingApproval ? (
           <div style={{
-            marginTop: '20px',
-            padding: '14px 16px',
-            borderRadius: '10px',
-            background: 'rgba(255, 149, 0, 0.1)',
-            border: '1px solid rgba(255, 149, 0, 0.25)',
-            color: '#ff9500',
-            fontSize: '13px',
-            lineHeight: 1.5,
+            marginTop: '24px',
+            padding: '18px',
+            borderRadius: '12px',
+            background: 'rgba(20, 22, 35, 0.5)',
+            border: '1px solid rgba(255, 149, 0, 0.2)',
           }}>
-            You cannot access the dashboard until an admin approves this HWID.
+            <div style={{ color: '#ff9500', fontSize: '14px', fontWeight: 700 }}>
+              Waiting for admin approval
+            </div>
+            <div style={{ color: '#8b92a8', fontSize: '13px', marginTop: '8px', lineHeight: 1.6 }}>
+              Your HWID has been submitted.
+              <br />
+              The textbox stays hidden while it is under review.
+              <br />
+              This page will move you to the dashboard automatically once approved.
+            </div>
+            {message && (
+              <p style={{
+                color: message.includes('denied') ? '#ff4444' : '#ff9500',
+                fontSize: '13px',
+                marginTop: '12px',
+              }}>
+                {message}
+              </p>
+            )}
           </div>
+        ) : (
+          <form onSubmit={handleSubmit} style={{ marginTop: '24px' }}>
+            <label style={{ display: 'block', color: '#fff', fontSize: '14px', fontWeight: 600, marginBottom: '10px' }}>
+              HWID
+            </label>
+            <input
+              value={hwid}
+              onChange={(e) => setHwid(e.target.value)}
+              placeholder="Paste your HWID here"
+              style={{
+                width: '100%',
+                padding: '14px 16px',
+                background: 'rgba(10, 12, 21, 0.8)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: '8px',
+                color: '#fff',
+                fontSize: '14px',
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+
+            {message && (
+              <p style={{ color: message.includes('saved') ? '#00ff88' : '#ff4444', fontSize: '13px', marginTop: '12px' }}>
+                {message}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={saving}
+              style={{
+                marginTop: '20px',
+                width: '100%',
+                padding: '12px 18px',
+                background: saving ? '#3a3d4e' : '#00ff88',
+                color: '#0a0c15',
+                border: 'none',
+                borderRadius: '8px',
+                fontWeight: 700,
+                cursor: saving ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {saving ? 'Saving...' : 'Submit HWID'}
+            </button>
+          </form>
         )}
-
-        <form onSubmit={handleSubmit} style={{ marginTop: '24px' }}>
-          <label style={{ display: 'block', color: '#fff', fontSize: '14px', fontWeight: 600, marginBottom: '10px' }}>
-            HWID
-          </label>
-          <input
-            value={hwid}
-            onChange={(e) => setHwid(e.target.value)}
-            placeholder="Paste your HWID here"
-            style={{
-              width: '100%',
-              padding: '14px 16px',
-              background: 'rgba(10, 12, 21, 0.8)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: '8px',
-              color: '#fff',
-              fontSize: '14px',
-              outline: 'none',
-              boxSizing: 'border-box',
-            }}
-          />
-
-          {message && (
-            <p style={{ color: message.includes('saved') ? '#00ff88' : '#ff4444', fontSize: '13px', marginTop: '12px' }}>
-              {message}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={saving}
-            style={{
-              marginTop: '20px',
-              width: '100%',
-              padding: '12px 18px',
-              background: saving ? '#3a3d4e' : '#00ff88',
-              color: '#0a0c15',
-              border: 'none',
-              borderRadius: '8px',
-              fontWeight: 700,
-              cursor: saving ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {saving ? 'Saving...' : 'Submit HWID'}
-          </button>
-        </form>
       </div>
     </div>
   )
