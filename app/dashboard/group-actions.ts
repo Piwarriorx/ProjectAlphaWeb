@@ -5,13 +5,18 @@ import { createServerSupabase } from '@/lib/supabase/server'
 export async function updateUserGroup(userId: number, groupId: string | null) {
   const supabase = await createServerSupabase()
 
-  const { error } = await supabase
+  console.log('Updating user group:', { userId, groupId })
+
+  const { data, error } = await supabase
     .from('users')
     .update({ group_id: groupId })
     .eq('id', userId)
+    .select()
+
+  console.log('Update result:', { data, error })
 
   if (error) return { error: error.message }
-  return { success: true }
+  return { success: true, data }
 }
 
 export async function getUsersWithGroups() {
