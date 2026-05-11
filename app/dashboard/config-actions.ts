@@ -3,32 +3,60 @@
 import { createServerSupabase } from '@/lib/supabase/server'
 
 export async function saveUserConfig(userId: number, configText: string) {
-  const supabase = await createServerSupabase()
+  try {
+    const supabase = await createServerSupabase()
 
-  const { data, error } = await supabase
-    .rpc('save_user_config', {
-      p_user_id: userId,
-      p_config_text: configText
-    })
+    console.log('Attempting to save config for user:', userId)
+    console.log('Config text length:', configText.length)
 
-  if (error) {
-    return { error: error.message }
+    // Use upsert instead of RPC to avoid potential function issues
+    const { data, error } = await supabase
+      .from('user_config')
+      .upsert({
+        user_id: userId,
+        config_text: configText,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'user_id'
+      })
+      .select()
+
+    if (error) {
+      console.error('Supabase upsert error:', error)
+      return { error: `Database error: ${error.message}` }
+    }
+
+    console.log('Config saved successfully')
+    return { success: true }
+  } catch (err) {
+    console.error('Unexpected error in saveUserConfig:', err)
+    return { error: `Unexpected error: ${err instanceof Error ? err.message : 'Unknown error'}` }
   }
-
-  return { success: true }
 }
 
 export async function getUserConfig(userId: number) {
-  const supabase = await createServerSupabase()
+  try {
+    const supabase = await createServerSupabase()
 
-  const { data, error } = await supabase
-    .rpc('get_user_config', {
-      p_user_id: userId
-    })
+    console.log('Attempting to get config for user:', userId)
 
-  if (error) {
-    return { configText: '', error: error.message }
+    // Use direct table access instead of RPC
+    const { data, error } = await supabase
+      .from('user_config')
+      .select('config_text')
+      .eq('user_id', userId)
+      .single()
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+      console.error('Supabase select error in getUserConfig:', error)
+      return { configText: '', error: `Database error: ${error.message}` }
+    }
+
+    const configText = data?.config_text || ''
+    console.log('Config retrieved successfully, length:', configText.length)
+    return { configText, error: null }
+  } catch (err) {
+    console.error('Unexpected error in getUserConfig:', err)
+    return { configText: '', error: `Unexpected error: ${err instanceof Error ? err.message : 'Unknown error'}` }
   }
-
-  return { configText: data?.[0]?.config_text || '', error: null }
 }
