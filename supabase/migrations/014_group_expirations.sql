@@ -25,17 +25,17 @@ CREATE POLICY "Allow service role full access to group expirations" ON public.gr
     OR current_user LIKE 'service_role%'
   );
 
-CREATE OR REPLACE FUNCTION public.update_group_expiration(p_group_id TEXT, p_servertime TIMESTAMPTZ, p_expiretime TIMESTAMPTZ)
+CREATE OR REPLACE FUNCTION public.update_group_expiration(p_group_id TEXT, p_expiretime TIMESTAMPTZ)
 RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
   INSERT INTO public.group_expirations (group_id, servertime, expiretime)
-  VALUES (p_group_id, p_servertime, p_expiretime)
+  VALUES (p_group_id, NOW(), p_expiretime)
   ON CONFLICT (group_id)
   DO UPDATE SET
-    servertime = EXCLUDED.servertime,
+    servertime = NOW(),
     expiretime = EXCLUDED.expiretime;
 END;
 $$;

@@ -100,14 +100,13 @@ export async function getAvailableGroups() {
   return { groups: uniqueGroups, error: null }
 }
 
-export async function updateGroupExpiration(groupId: string, servertime: string, expiretime: string) {
+export async function updateGroupExpiration(groupId: string, expiretime: string) {
   const supabase = await createServerSupabase()
 
-  console.log('Calling update_group_expiration RPC with:', { p_group_id: groupId, p_servertime: servertime, p_expiretime: expiretime });
+  console.log('Calling update_group_expiration RPC with:', { p_group_id: groupId, p_expiretime: expiretime });
 
   const { error } = await supabase.rpc('update_group_expiration', {
     p_group_id: groupId,
-    p_servertime: servertime,
     p_expiretime: expiretime
   })
 

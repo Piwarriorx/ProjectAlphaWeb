@@ -555,13 +555,10 @@ useEffect(() => {
     const now = new Date()
     const expireDate = new Date(now.getTime() + totalSeconds * 1000)
 
-    console.log('Attempting to save expiration for group:', editingGroupId, 'Server Time:', now.toISOString(), 'Expire Time:', expireDate.toISOString());
-    const result = await updateGroupExpiration(
+    console.log('Attempting to save expiration for group:', editingGroupId, '
       editingGroupId,
-      now.toISOString(),
       expireDate.toISOString()
-    )
-    console.log('Result from updateGroupExpiration server action:', result);
+    )nsole.log('Result from updateGroupExpiration server action:', result);
 
     if (result.error) {
       setManagementMessage(result.error)
@@ -1769,16 +1766,21 @@ useEffect(() => {
                     View each group's server time, expiration time, and remaining time.
                   </p>
                 </div>
-                <div style={{
-                  padding: '8px 16px',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  background: 'rgba(0, 255, 136, 0.1)',
-                  color: '#00ff88',
-                  border: '1px solid rgba(0, 255, 136, 0.3)',
-                }}>
-                  {sortedGroupExpirations.length} group(s)
+                <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                  {man
+                    </div>
+                  )}
+                  <div style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    background: 'rgba(0, 255, 136, 0.1)',
+                    color: '#00ff88',
+                    border: '1px solid rgba(0, 255, 136, 0.3)',
+                  }}>
+                    {sortedGroupExpirations.length} group(s)
+                  </div>
                 </div>
               </div>
 
