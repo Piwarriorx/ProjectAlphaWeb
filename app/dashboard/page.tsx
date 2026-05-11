@@ -1198,7 +1198,6 @@ export default function DashboardPage() {
                 ))}
               </div>
             </div>
-          </div>
 
           <div style={{
             background: 'rgba(20, 22, 35, 0.7)',
