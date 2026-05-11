@@ -25,6 +25,9 @@ export async function saveUserConfig(userId: number, configText: string) {
       if (error.message.includes('does not exist')) {
         return { error: 'The user_config table does not exist. Please run the SQL in create-user-config-table.sql in your Supabase SQL editor.' }
       }
+      if (error.message.includes('row-level security policy')) {
+        return { error: 'RLS policy violation. Please run the SQL in fix-rls-policy.sql in your Supabase SQL editor.' }
+      }
       return { error: `Database error: ${error.message}` }
     }
 
