@@ -143,11 +143,33 @@ export default function HwidPage() {
     setSaving(false)
   }
 
+  function logout() {
+    localStorage.removeItem('ezcrosshair_user')
+    window.location.href = '/login'
+  }
+
   if (loading) return <div style={{ color: '#fff', padding: 32 }}>Loading...</div>
 
   return (
     <div style={{ minHeight: '100vh', background: '#0a0c15', padding: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ width: '100%', maxWidth: '520px', background: 'rgba(20, 22, 35, 0.75)', border: '1px solid rgba(0, 255, 136, 0.18)', borderRadius: '16px', padding: '32px' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '12px' }}>
+          <button
+            onClick={logout}
+            style={{
+              padding: '8px 16px',
+              background: 'transparent',
+              color: '#ff6b6b',
+              border: '1px solid rgba(255, 107, 107, 0.4)',
+              borderRadius: '8px',
+              cursor: 'pointer',
+              fontSize: '12px',
+              fontWeight: 600,
+            }}
+          >
+            Log Out
+          </button>
+        </div>
         <h1 style={{ color: '#fff', fontSize: '28px', margin: 0 }}>HWID Setup</h1>
         <p style={{ color: '#5a6072', marginTop: '8px' }}>
           {pendingApproval
