@@ -674,7 +674,19 @@ useEffect(() => {
           borderBottom: '1px solid rgba(255,255,255,0.1)'
         }}>
           <div style={{ minWidth: 0 }}>
-            <h1 style={{ color: '#fff', fontSize: '32px', fontWeight: 700 }}>
+                        <h1 
+              onClick={() => window.location.reload()}
+              style={{ 
+                color: '#fff', 
+                fontSize: '32px', 
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'opacity 0.2s ease',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = '0.7'}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+              //title="Click to refresh"
+            >
               ProjectAlpha
             </h1>
             <p style={{ color: '#ff9500', fontSize: '18px', marginTop: '8px' }}>
