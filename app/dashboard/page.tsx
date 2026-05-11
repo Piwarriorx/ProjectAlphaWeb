@@ -202,7 +202,7 @@ export default function DashboardPage() {
 
   }, [user, loading, users])
 
-      useEffect(() => {
+        useEffect(() => {
     if (user?.role !== 'admin') return
 
     const channel = supabase
@@ -216,7 +216,7 @@ export default function DashboardPage() {
 
           fetchUsers()
 
-          // Auto-refresh page kapag nagbago ang role ng current user
+          // Auto-refresh kapag nagbago ang role ng current user
           if (
             payload.eventType === 'UPDATE' &&
             changedUser?.role !== oldUser?.role
