@@ -100,7 +100,7 @@ export default function DashboardPage() {
     if (userData.role === 'user') {
       setActiveTab('files')
     } else if (userData.role === 'admin') {
-      setActiveTab('users')
+      setActiveTab('files')
     }
 
     fetchUsers()
@@ -419,22 +419,6 @@ export default function DashboardPage() {
             width: 'fit-content',
           }}>
             <button
-              onClick={() => setActiveTab('users')}
-              style={{
-                padding: '10px 24px',
-                borderRadius: '10px',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 600,
-                transition: 'all 0.2s ease',
-                background: activeTab === 'users' ? 'rgba(255, 149, 0, 0.15)' : 'transparent',
-                color: activeTab === 'users' ? '#ff9500' : '#5a6072',
-              }}
-            >
-              Users
-            </button>
-            <button
               onClick={() => setActiveTab('files')}
               style={{
                 padding: '10px 24px',
@@ -465,6 +449,22 @@ export default function DashboardPage() {
               }}
             >
               Config
+            </button>
+            <button
+              onClick={() => setActiveTab('users')}
+              style={{
+                padding: '10px 24px',
+                borderRadius: '10px',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 600,
+                transition: 'all 0.2s ease',
+                background: activeTab === 'users' ? 'rgba(255, 149, 0, 0.15)' : 'transparent',
+                color: activeTab === 'users' ? '#ff9500' : '#5a6072',
+              }}
+            >
+              Users
             </button>
             <button
               onClick={() => setActiveTab('management')}
