@@ -147,6 +147,36 @@ export default function DashboardPage() {
     }
   }, [user, loading, users])
 
+  useEffect(() => {
+    if (user?.role !== 'admin') return
+
+    const channel = supabase
+      .channel('admin-hwid-requests')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'users' },
+        (payload) => {
+          const changedUser = payload.new as Partial<User> | null
+
+          fetchUsers()
+
+          if (
+            payload.eventType === 'UPDATE' &&
+            changedUser?.hwid?.trim() &&
+            changedUser.hwid_approved !== true
+          ) {
+            setManagementMessage('New HWID request received!')
+            setTimeout(() => setManagementMessage(''), 3000)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user])
+
   async function fetchUsers() {
     const { data, error } = await supabase
       .from('users')
