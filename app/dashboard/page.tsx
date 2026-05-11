@@ -684,68 +684,6 @@ useEffect(() => {
   Server Time: {time} <span style={{ fontSize: '11px', color: '#5a6072', fontWeight: 400, letterSpacing: '1px' }}>PHT</span>
 </div>
 
-{/* Group Expiration Display */}
-{userGroupId && userGroupId !== 'not set' && (
-  <div style={{ marginTop: '8px' }}>
-    {userGroupExpiration ? (
-      <div style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '8px',
-        padding: '6px 14px',
-        borderRadius: '8px',
-        background: isGroupExpired
-          ? 'rgba(255, 68, 68, 0.12)'
-          : 'rgba(0, 255, 136, 0.1)',
-        border: `1px solid ${isGroupExpired
-          ? 'rgba(255, 68, 68, 0.3)'
-          : 'rgba(0, 255, 136, 0.25)'}`,
-      }}>
-        <span style={{
-          width: '8px',
-          height: '8px',
-          borderRadius: '50%',
-          background: isGroupExpired ? '#ff4444' : '#00ff88',
-          display: 'inline-block',
-        }} />
-        <span style={{
-          color: isGroupExpired ? '#ff4444' : '#00ff88',
-          fontSize: '13px',
-          fontWeight: 600,
-          fontFamily: 'monospace',
-        }}>
-          {isGroupExpired ? 'Expired' : formatRemainingTime(userGroupExpiration.expiretime)}
-        </span>
-      </div>
-    ) : (
-      <div style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: '8px',
-        padding: '6px 14px',
-        borderRadius: '8px',
-        background: 'rgba(255, 149, 0, 0.1)',
-        border: '1px solid rgba(255, 149, 0, 0.25)',
-      }}>
-        <span style={{
-          width: '8px',
-          height: '8px',
-          borderRadius: '50%',
-          background: '#ff9500',
-          display: 'inline-block',
-        }} />
-        <span style={{
-          color: '#ff9500',
-          fontSize: '13px',
-          fontWeight: 600,
-        }}>
-          Group {userGroupId} — No expiration set
-        </span>
-      </div>
-    )}
-  </div>
-)}
-
 {/* Users in the same group */}
             <div style={{
               marginTop: '12px',
