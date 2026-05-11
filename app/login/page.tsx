@@ -54,6 +54,7 @@ export default function LoginPage() {
   
   if (result?.success === 'login' && result?.userId) {
     localStorage.setItem('ezcrosshair_user', JSON.stringify({
+      id: result.userId,
       userId: result.userId,
       username: result.username,
       role: result.role  // <-- Store role

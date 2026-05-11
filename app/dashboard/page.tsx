@@ -9,6 +9,8 @@ import { updateUserGroup, getUsersWithGroups, getAvailableGroups, updateUserRole
 
 interface User {
   id: number
+  userId?: number | string
+  user_id?: number | string
   username: string
   role: string
   created_at: string
@@ -33,6 +35,18 @@ function formatBytes(bytes: number) {
   const sizes = ['B', 'KB', 'MB', 'GB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+function getUserId(user: User | null) {
+  if (!user) return null
+
+  const rawId = user.id ?? user.userId ?? user.user_id
+  if (typeof rawId === 'string') {
+    const parsed = parseInt(rawId, 10)
+    return Number.isNaN(parsed) ? null : parsed
+  }
+
+  return typeof rawId === 'number' && rawId > 0 ? rawId : null
 }
 
 export default function DashboardPage() {
@@ -322,7 +336,7 @@ export default function DashboardPage() {
               maxWidth: '520px',
             }}>
               {(() => {
-                const userId = typeof user.id === 'string' ? parseInt(user.id, 10) : user.id
+                const userId = getUserId(user)
                 const dbUser = users.find(u => u.id === userId)
                 const myGroupRaw = dbUser?.group_id ?? user.group_id ?? 'not set'
                 const myGroup = String(myGroupRaw)
