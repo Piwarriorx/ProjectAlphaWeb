@@ -989,7 +989,7 @@ export default function DashboardPage() {
                           }}
                         >
                           <option value="user">user</option>
-                          <option value="admin">admin</option>
+
                           <option value="pending">pending</option>
                         </select>
                       )}
