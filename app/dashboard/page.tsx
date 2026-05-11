@@ -1265,7 +1265,8 @@ useEffect(() => {
 
         {/* Admin - Management Tab */}
         {user.role === 'admin' && activeTab === 'management' && (
-          <div style={{ marginBottom: '32px', padding: '24px', background: 'rgba(20,22,35,0.7)', borderRadius: '12px' }}>
+          <div>
+            <div style={{ marginBottom: '32px', padding: '24px', background: 'rgba(20,22,35,0.7)', borderRadius: '12px' }}>
   <h3 style={{ color: '#00ff88', marginBottom: '12px' }}>Update Group Expiration</h3>
   <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
     <select
@@ -1337,7 +1338,6 @@ useEffect(() => {
   </div>
 </div>
 
-          <div>
             <div style={{
               background: 'rgba(20, 22, 35, 0.7)',
               border: '1px solid rgba(255, 149, 0, 0.2)',
