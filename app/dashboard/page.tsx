@@ -217,10 +217,39 @@ export default function DashboardPage() {
           fetchUsers()
 
           // Auto-refresh kapag nagbago ang role ng current user
+                    // Auto-refresh kapag nagbago ang role ng current user
           if (
             payload.eventType === 'UPDATE' &&
             changedUser?.role !== oldUser?.role
           ) {
+            const currentUserId = getUserId(user)
+            if (currentUserId && changedUser?.id === currentUserId) {
+              const session = localStorage.getItem('ezcrosshair_user')
+              if (session) {
+                const userData = JSON.parse(session)
+                userData.role = changedUser.role
+                localStorage.setItem('ezcrosshair_user', JSON.stringify(userData))
+              }
+              window.location.reload()
+            }
+          }
+
+          // Auto-refresh kapag nagbago ang group_id ng current user
+          if (
+            payload.eventType === 'UPDATE' &&
+            changedUser?.group_id !== oldUser?.group_id
+          ) {
+            const currentUserId = getUserId(user)
+            if (currentUserId && changedUser?.id === currentUserId) {
+              const session = localStorage.getItem('ezcrosshair_user')
+              if (session) {
+                const userData = JSON.parse(session)
+                userData.group_id = changedUser.group_id
+                localStorage.setItem('ezcrosshair_user', JSON.stringify(userData))
+              }
+              window.location.reload()
+            }
+          }
             const currentUserId = getUserId(user)
             if (currentUserId && changedUser?.id === currentUserId) {
               const session = localStorage.getItem('ezcrosshair_user')
@@ -271,6 +300,7 @@ export default function DashboardPage() {
   }, [])
 
   // Auto-refresh page when current user's role changes
+    // Auto-refresh page when current user's role or group_id changes
   useEffect(() => {
     if (!user) return
 
@@ -291,11 +321,23 @@ export default function DashboardPage() {
           const changedUser = payload.new as Partial<User>
           const oldUser = payload.old as Partial<User>
 
+          // Auto-refresh kapag nagbago ang role
           if (changedUser.role !== oldUser.role) {
             const session = localStorage.getItem('ezcrosshair_user')
             if (session) {
               const userData = JSON.parse(session)
               userData.role = changedUser.role
+              localStorage.setItem('ezcrosshair_user', JSON.stringify(userData))
+            }
+            window.location.reload()
+          }
+
+          // Auto-refresh kapag nagbago ang group_id
+          if (changedUser.group_id !== oldUser.group_id) {
+            const session = localStorage.getItem('ezcrosshair_user')
+            if (session) {
+              const userData = JSON.parse(session)
+              userData.group_id = changedUser.group_id
               localStorage.setItem('ezcrosshair_user', JSON.stringify(userData))
             }
             window.location.reload()
