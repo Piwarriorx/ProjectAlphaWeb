@@ -736,8 +736,12 @@ useEffect(() => {
 
                     <div style={{ display: 'flex', justifyContent: 'center' }}>
             <button
-              onClick={() => {
-                if (!canLaunch) return
+                            onClick={() => {
+                if (!canLaunch) {
+                  alert(`Launch blocked!\n\ncanLaunch: ${canLaunch}\nlaunchUrl: ${launchUrl || 'empty'}\nhasApprovedHwid: ${hasApprovedHwid}\nisGroupExpired: ${isGroupExpired}\nuserGroupId: ${userGroupId || 'none'}\nuserGroupExpiration: ${userGroupExpiration ? userGroupExpiration.expiretime : 'none'}`)
+                  return
+                }
+                alert(`Launching!\n\nURL: ${launchUrl}`)
                 window.location.href = launchUrl
               }}
               disabled={!canLaunch}
