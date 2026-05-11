@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { approveUser, rejectUser } from './actions'
 import { uploadFile, listFiles, deleteFile, getSignedDownloadUrl } from './file-actions'
 import { saveUserConfig, getUserConfig } from './config-actions'
-import { updateUserGroup, updateUserRole, updateUserHwidApproval, bulkUpdateUserRole, bulkUpdateUserGroup, bulkDeleteUsers } from './group-actions'
+import { updateUserGroup, updateUserRole, updateUserHwidApproval, bulkUpdateUserRole, bulkUpdateUserGroup, bulkDeleteUsers, updateGroupExpiration } from './group-actions'
 
 interface User {
   id: number
@@ -116,6 +116,14 @@ export default function DashboardPage() {
   const [bulkRole, setBulkRole] = useState('user')
   const [bulkGroupId, setBulkGroupId] = useState('not set')
   const [bulkProcessing, setBulkProcessing] = useState(false)
+
+  // Expiration Editor State
+  const [isExpModalOpen, setIsExpModalOpen] = useState(false)
+  const [editingGroupId, setEditingGroupId] = useState('')
+  const [expDays, setExpDays] = useState('0')
+  const [expHours, setExpHours] = useState('0')
+  const [expMinutes, setExpMinutes] = useState('0')
+  const [expSeconds, setExpSeconds] = useState('0')
   
   // Predefined groups
   const predefinedGroups = ['not set', '1', '2', '3', '4', '5']
@@ -530,6 +538,36 @@ useEffect(() => {
       await fetchUsers()
     }
 
+    setBulkProcessing(false)
+    setTimeout(() => setManagementMessage(''), 3000)
+  }
+
+  async function handleSaveExpiration() {
+    if (!editingGroupId) return
+    setBulkProcessing(true)
+
+    const d = parseInt(expDays) || 0
+    const h = parseInt(expHours) || 0
+    const m = parseInt(expMinutes) || 0
+    const s = parseInt(expSeconds) || 0
+    const totalSeconds = (d * 86400) + (h * 3600) + (m * 60) + s
+
+    const now = new Date()
+    const expireDate = new Date(now.getTime() + totalSeconds * 1000)
+
+    const result = await updateGroupExpiration(
+      editingGroupId,
+      now.toISOString(),
+      expireDate.toISOString()
+    )
+
+    if (result.error) {
+      setManagementMessage(result.error)
+    } else {
+      setManagementMessage(`Successfully updated expiration for Group ${editingGroupId}`)
+      fetchGroupExpirations()
+      setIsExpModalOpen(false)
+    }
     setBulkProcessing(false)
     setTimeout(() => setManagementMessage(''), 3000)
   }
@@ -1750,7 +1788,7 @@ useEffect(() => {
                 {/* Header */}
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: '1fr 1.2fr 1.2fr 1fr 2fr', // Added last column for users
+                  gridTemplateColumns: '80px 1.2fr 1.2fr 1fr 1.5fr 100px',
                   padding: '16px 24px',
                   background: 'rgba(0, 0, 0, 0.3)',
                   borderBottom: '1px solid rgba(255,255,255,0.05)',
@@ -1765,6 +1803,7 @@ useEffect(() => {
                   <div>Expire Time</div>
                   <div>Remaining</div>
                   <div>Users</div>
+                  <div>Action</div>
                 </div>
 
                 {sortedGroupExpirations.length === 0 && (
@@ -1781,7 +1820,7 @@ useEffect(() => {
                 {sortedGroupExpirations.map(group => (
                   <div key={group.id} style={{
                     display: 'grid',
-                    gridTemplateColumns: '1fr 1.2fr 1.2fr 1fr 2fr',
+                    gridTemplateColumns: '80px 1.2fr 1.2fr 1fr 1.5fr 100px',
                     padding: '16px 24px',
                     borderBottom: '1px solid rgba(255,255,255,0.05)',
                     alignItems: 'center',
@@ -1820,6 +1859,30 @@ useEffect(() => {
                           </span>
                         ))
                       }
+                    </div>
+                    <div>
+                      <button
+                        onClick={() => {
+                          setEditingGroupId(group.group_id)
+                          setExpDays('0')
+                          setExpHours('0')
+                          setExpMinutes('0')
+                          setExpSeconds('0')
+                          setIsExpModalOpen(true)
+                        }}
+                        style={{
+                          padding: '6px 12px',
+                          background: 'rgba(255, 149, 0, 0.12)',
+                          color: '#ff9500',
+                          border: '1px solid rgba(255, 149, 0, 0.3)',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                        }}
+                      >
+                        Edit
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -2049,6 +2112,104 @@ useEffect(() => {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Expiration Editor Modal */}
+        {isExpModalOpen && (
+          <div style={{
+            position: 'fixed',
+            top: 0, left: 0, right: 0, bottom: 0,
+            background: 'rgba(0,0,0,0.85)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            backdropFilter: 'blur(4px)',
+          }}>
+            <div style={{
+              background: '#0a0c15',
+              padding: '32px',
+              borderRadius: '20px',
+              border: '1px solid rgba(255, 149, 0, 0.3)',
+              width: '100%',
+              maxWidth: '440px',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.5)',
+            }}>
+              <h2 style={{ color: '#ff9500', fontSize: '22px', marginBottom: '8px' }}>Set Group Expiration</h2>
+              <p style={{ color: '#5a6072', fontSize: '14px', marginBottom: '24px' }}>
+                Updating group: <span style={{ color: '#fff', fontWeight: 600 }}>{editingGroupId}</span>
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '32px' }}>
+                {[
+                  { label: 'Days', val: expDays, set: setExpDays },
+                  { label: 'Hours', val: expHours, set: setExpHours },
+                  { label: 'Minutes', val: expMinutes, set: setExpMinutes },
+                  { label: 'Seconds', val: expSeconds, set: setExpSeconds },
+                ].map((input) => (
+                  <div key={input.label}>
+                    <label style={{ display: 'block', color: '#8b92a8', fontSize: '12px', marginBottom: '8px', textTransform: 'uppercase', fontWeight: 600 }}>
+                      {input.label}
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={input.val}
+                      onChange={(e) => input.set(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        background: 'rgba(10, 12, 21, 0.8)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px',
+                        color: '#fff',
+                        fontSize: '14px',
+                        outline: 'none',
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  onClick={() => setIsExpModalOpen(false)}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    background: 'transparent',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '10px',
+                    color: '#8b92a8',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveExpiration}
+                  disabled={bulkProcessing}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    background: '#ff9500',
+                    border: 'none',
+                    borderRadius: '10px',
+                    color: '#0a0c15',
+                    cursor: bulkProcessing ? 'not-allowed' : 'pointer',
+                    fontSize: '14px',
+                    fontWeight: 700,
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  {bulkProcessing ? 'Saving...' : 'Save Expiration'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

@@ -99,3 +99,16 @@ export async function getAvailableGroups() {
   const uniqueGroups = [...new Set(data?.map(u => u.group_id).filter(Boolean))]
   return { groups: uniqueGroups, error: null }
 }
+
+export async function updateGroupExpiration(groupId: string, servertime: string, expiretime: string) {
+  const supabase = await createServerSupabase()
+
+  const { error } = await supabase.rpc('update_group_expiration', {
+    p_group_id: groupId,
+    p_servertime: servertime,
+    p_expiretime: expiretime
+  })
+
+  if (error) return { error: error.message }
+  return { success: true }
+}
