@@ -2409,7 +2409,7 @@ useEffect(() => {
                     transition: 'all 0.2s ease',
                   }}
                 >
-                  {bulkProcessing ? 'Saving...' : 'Save Expiration'}
+                  {bulkProcessing ? 'Saving...' : 'Update Expiration'}
                 </button>
               </div>
             </div>
