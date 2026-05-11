@@ -69,15 +69,18 @@ function formatRemainingTime(expiretime: string) {
   if (Number.isNaN(diff)) return 'Invalid date'
   if (diff <= 0) return 'Expired'
 
-  const totalMinutes = Math.floor(diff / 60000)
-  const days = Math.floor(totalMinutes / 1440)
-  const hours = Math.floor((totalMinutes % 1440) / 60)
-  const minutes = totalMinutes % 60
+  const totalSeconds = Math.floor(diff / 1000)
+  const days = Math.floor(totalSeconds / 86400)
+  const hours = Math.floor((totalSeconds % 86400) / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
 
   const parts = []
   if (days > 0) parts.push(`${days}d`)
   if (hours > 0) parts.push(`${hours}h`)
-  if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`)
+  if (minutes > 0) parts.push(`${minutes}m`)
+  parts.push(`${seconds}s`) // always show seconds
+
   return parts.join(' ')
 }
 
@@ -1733,9 +1736,10 @@ export default function DashboardPage() {
                 borderRadius: '12px',
                 overflow: 'hidden',
               }}>
+                {/* Header */}
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: '1fr 1.2fr 1.2fr 1fr',
+                  gridTemplateColumns: '1fr 1.2fr 1.2fr 1fr 2fr', // Added last column for users
                   padding: '16px 24px',
                   background: 'rgba(0, 0, 0, 0.3)',
                   borderBottom: '1px solid rgba(255,255,255,0.05)',
@@ -1749,6 +1753,7 @@ export default function DashboardPage() {
                   <div>Server Time</div>
                   <div>Expire Time</div>
                   <div>Remaining</div>
+                  <div>Users</div>
                 </div>
 
                 {sortedGroupExpirations.length === 0 && (
@@ -1765,20 +1770,14 @@ export default function DashboardPage() {
                 {sortedGroupExpirations.map(group => (
                   <div key={group.id} style={{
                     display: 'grid',
-                    gridTemplateColumns: '1fr 1.2fr 1.2fr 1fr',
+                    gridTemplateColumns: '1fr 1.2fr 1.2fr 1fr 2fr',
                     padding: '16px 24px',
                     borderBottom: '1px solid rgba(255,255,255,0.05)',
                     alignItems: 'center',
                   }}>
-                    <div style={{ color: '#fff', fontWeight: 600 }}>
-                      {group.group_id}
-                    </div>
-                    <div style={{ color: '#8b92a8', fontSize: '13px' }}>
-                      {formatDateTime(group.servertime)}
-                    </div>
-                    <div style={{ color: '#8b92a8', fontSize: '13px' }}>
-                      {formatDateTime(group.expiretime)}
-                    </div>
+                    <div style={{ color: '#fff', fontWeight: 600 }}>{group.group_id}</div>
+                    <div style={{ color: '#8b92a8', fontSize: '13px' }}>{formatDateTime(group.servertime)}</div>
+                    <div style={{ color: '#8b92a8', fontSize: '13px' }}>{formatDateTime(group.expiretime)}</div>
                     <div>
                       <span style={{
                         display: 'inline-flex',
@@ -1796,6 +1795,20 @@ export default function DashboardPage() {
                       }}>
                         {formatRemainingTime(group.expiretime)}
                       </span>
+                    </div>
+                    <div style={{ color: '#fff', fontSize: '12px', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {users
+                        .filter(u => String(u.group_id || 'not set') === group.group_id)
+                        .map(u => (
+                          <span key={u.id} style={{
+                            background: 'rgba(10,12,21,0.5)',
+                            padding: '2px 6px',
+                            borderRadius: '6px',
+                          }}>
+                            {u.username}
+                          </span>
+                        ))
+                      }
                     </div>
                   </div>
                 ))}
