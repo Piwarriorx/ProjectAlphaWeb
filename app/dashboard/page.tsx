@@ -133,6 +133,20 @@ export default function DashboardPage() {
     fetchLaunchData()
   }, [])
 
+  useEffect(() => {
+    if (!user || loading) return
+
+    const currentUserId = getUserId(user)
+    if (!currentUserId) return
+
+    const currentUserRow = users.find(u => u.id === currentUserId)
+    if (currentUserRow === undefined) return
+
+    if (currentUserRow.role !== 'admin' && !currentUserRow.hwid?.trim() && window.location.pathname !== '/hwid') {
+      window.location.href = '/hwid'
+    }
+  }, [user, loading, users])
+
   async function fetchUsers() {
     const { data, error } = await supabase
       .from('users')
@@ -331,7 +345,7 @@ export default function DashboardPage() {
     if (result.error) {
       setManagementMessage(result.error)
     } else {
-      setManagementMessage(approved ? 'HWID approved successfully!' : 'HWID approval revoked!')
+      setManagementMessage(approved ? 'HWID approved successfully!' : 'HWID denied successfully!')
       fetchUsers()
     }
 
@@ -1334,7 +1348,7 @@ export default function DashboardPage() {
                             transition: 'all 0.2s ease',
                           }}
                         >
-                          {!hasHwid ? 'Unavailable' : isApproved ? 'Revoke' : 'Approve'}
+                          {!hasHwid ? 'Unavailable' : isApproved ? 'Deny' : 'Approve'}
                         </button>
                       </div>
                     </div>
