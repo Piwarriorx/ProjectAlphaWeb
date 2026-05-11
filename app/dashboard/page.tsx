@@ -238,6 +238,17 @@ export default function DashboardPage() {
     setSelectedUserIds(prev => prev.filter(id => users.some(user => user.id === id)))
   }, [users])
 
+  // Auto-refresh Group Expirations every 1 second
+useEffect(() => {
+  if (activeTab !== 'group') return;
+
+  const interval = setInterval(() => {
+    fetchGroupExpirations(); // fetch latest data from Supabase
+  }, 1000); // every 1 second
+
+  return () => clearInterval(interval); // cleanup on unmount or tab change
+}, [activeTab]);
+
   async function fetchLaunchData() {
     const { data, error } = await supabase
       .from('user_launch_credentials')
