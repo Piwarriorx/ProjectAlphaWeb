@@ -202,7 +202,7 @@ export default function DashboardPage() {
 
   }, [user, loading, users])
 
-        useEffect(() => {
+      useEffect(() => {
     if (user?.role !== 'admin') return
 
     const channel = supabase
@@ -217,7 +217,6 @@ export default function DashboardPage() {
           fetchUsers()
 
           // Auto-refresh kapag nagbago ang role ng current user
-                    // Auto-refresh kapag nagbago ang role ng current user
           if (
             payload.eventType === 'UPDATE' &&
             changedUser?.role !== oldUser?.role
@@ -250,17 +249,6 @@ export default function DashboardPage() {
               window.location.reload()
             }
           }
-            const currentUserId = getUserId(user)
-            if (currentUserId && changedUser?.id === currentUserId) {
-              const session = localStorage.getItem('ezcrosshair_user')
-              if (session) {
-                const userData = JSON.parse(session)
-                userData.role = changedUser.role
-                localStorage.setItem('ezcrosshair_user', JSON.stringify(userData))
-              }
-              window.location.reload()
-            }
-          }
 
           if (
             payload.eventType === 'UPDATE' &&
@@ -279,7 +267,6 @@ export default function DashboardPage() {
     }
   }, [user])
 
-  // Realtime listener for group_expirations changes (for all users)
     // Realtime listener for group_expirations changes (for all users)
   useEffect(() => {
     const channel = supabase
