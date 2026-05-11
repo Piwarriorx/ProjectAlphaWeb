@@ -48,7 +48,11 @@ export async function updateUserHwidApproval(userId: number, approved: boolean) 
 
   console.log('HWID approval update result:', { data, error })
 
-  if (error) return { error: erexport async function bulkUpdateUserRole(userIds: number[], role: string) {
+  if (error) return { error: error.message }
+  return { success: true, data }
+}
+
+export async function bulkUpdateUserRole(userIds: number[], role: string) {
   const supabase = await createServerSupabase()
 
   for (const userId of userIds) {
@@ -79,10 +83,6 @@ export async function bulkDeleteUsers(userIds: number[]) {
   }
 
   return { success: true }
-}
-
-ror.message }
-  return { success: true, data }
 }
 
 export async function getAvailableGroups() {
