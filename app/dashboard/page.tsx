@@ -1356,6 +1356,7 @@ export default function DashboardPage() {
                 })}
             </div>
           </div>
+        </div>
         )}
         {/* Regular User - Tabs */}
         {user.role === 'user' && (
