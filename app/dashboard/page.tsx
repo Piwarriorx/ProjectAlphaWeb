@@ -555,11 +555,13 @@ useEffect(() => {
     const now = new Date()
     const expireDate = new Date(now.getTime() + totalSeconds * 1000)
 
+    console.log('Attempting to save expiration for group:', editingGroupId, 'Server Time:', now.toISOString(), 'Expire Time:', expireDate.toISOString());
     const result = await updateGroupExpiration(
       editingGroupId,
       now.toISOString(),
       expireDate.toISOString()
     )
+    console.log('Result from updateGroupExpiration server action:', result);
 
     if (result.error) {
       setManagementMessage(result.error)
