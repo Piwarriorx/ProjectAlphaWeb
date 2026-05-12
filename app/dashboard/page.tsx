@@ -106,6 +106,7 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<'users' | 'files' | 'config' | 'management' | 'group'>('files')
   const [launchData, setLaunchData] = useState<LaunchCredential | null>(null)
   const [launching, setLaunching] = useState(false)
+  const [onlineUserIds, setOnlineUserIds] = useState<number[]>([])
   const [groupExpirations, setGroupExpirations] = useState<GroupExpiration[]>([])
   const [uploadMessage, setUploadMessage] = useState('')
   const [uploading, setUploading] = useState(false)
@@ -144,6 +145,45 @@ export default function DashboardPage() {
     const id = setInterval(update, 1000)
     return () => clearInterval(id)
   }, [])
+
+  useEffect(() => {
+    if (!user) return
+
+    const currentUserId = getUserId(user)
+    if (!currentUserId) return
+
+    const channel = supabase.channel('online-users', {
+      config: {
+        presence: {
+          key: String(currentUserId),
+        },
+      },
+    })
+
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const presenceState = channel.presenceState()
+        const ids = Object.keys(presenceState)
+          .map(id => parseInt(id, 10))
+          .filter(id => !Number.isNaN(id))
+        setOnlineUserIds(ids)
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({
+            user_id: currentUserId,
+            username: user.username,
+            role: user.role,
+            online_at: new Date().toISOString(),
+          })
+        }
+      })
+
+    return () => {
+      channel.untrack()
+      supabase.removeChannel(channel)
+    }
+  }, [user])
 
   useEffect(() => {
     const session = localStorage.getItem('ezcrosshair_user')
@@ -802,6 +842,37 @@ const launchButtonEnabled = canLaunch && !launching
     })
   const sortedGroupExpirations = [...groupExpirations].sort((a, b) => a.group_id.localeCompare(b.group_id))
 
+  const renderOnlineStatus = (userId: number) => {
+    const isOnline = onlineUserIds.includes(userId)
+
+    return (
+      <span style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '6px',
+        width: 'fit-content',
+        padding: '4px 10px',
+        borderRadius: '999px',
+        fontSize: '11px',
+        textTransform: 'uppercase',
+        fontWeight: 700,
+        background: isOnline ? 'rgba(0, 255, 136, 0.12)' : 'rgba(90, 96, 114, 0.15)',
+        color: isOnline ? '#00ff88' : '#5a6072',
+        border: `1px solid ${isOnline ? 'rgba(0, 255, 136, 0.25)' : 'rgba(90, 96, 114, 0.25)'}`,
+      }}>
+        <span style={{
+          width: '7px',
+          height: '7px',
+          borderRadius: '50%',
+          background: isOnline ? '#00ff88' : '#5a6072',
+          boxShadow: isOnline ? '0 0 8px rgba(0, 255, 136, 0.8)' : 'none',
+          display: 'inline-block',
+        }} />
+        {isOnline ? 'Online' : 'Offline'}
+      </span>
+    )
+  }
+
   if (!user) return null
   if (loading) return <div style={{ color: '#fff', padding: 32 }}>Loading...</div>
 
@@ -1142,6 +1213,8 @@ const launchButtonEnabled = canLaunch && !launching
                       Last login: {pendingUser.last_login_at ? new Date(pendingUser.last_login_at).toLocaleString() : '—'}
                       <br />
                       Last launch: {pendingUser.last_launch_at ? new Date(pendingUser.last_launch_at).toLocaleString() : '—'}
+                      <br />
+                      Status: {renderOnlineStatus(pendingUser.id)}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '12px' }}>
@@ -1224,7 +1297,7 @@ const launchButtonEnabled = canLaunch && !launching
               }}>
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: '1fr 120px 190px 220px 220px',
+                  gridTemplateColumns: 'minmax(140px, 1fr) 110px 120px 170px 200px 200px',
                   padding: '16px 24px',
                   background: 'rgba(0, 0, 0, 0.3)',
                   borderBottom: '1px solid rgba(255,255,255,0.05)',
@@ -1236,6 +1309,7 @@ const launchButtonEnabled = canLaunch && !launching
                 }}>
                   <div>Username</div>
                   <div>Role</div>
+                  <div>Status</div>
                   <div>Registered</div>
                   <div>Last login</div>
                   <div>Last launch</div>
@@ -1244,7 +1318,7 @@ const launchButtonEnabled = canLaunch && !launching
                 {users.filter(u => u.role !== 'pending').map(u => (
                   <div key={u.id} style={{
                     display: 'grid',
-                    gridTemplateColumns: '1fr 120px 190px 220px 220px',
+                    gridTemplateColumns: 'minmax(140px, 1fr) 110px 120px 170px 200px 200px',
                     padding: '16px 24px',
                     borderBottom: '1px solid rgba(255,255,255,0.05)',
                     alignItems: 'center',
@@ -1266,6 +1340,9 @@ const launchButtonEnabled = canLaunch && !launching
                       }}>
                         {u.role}
                       </span>
+                    </div>
+                    <div>
+                      {renderOnlineStatus(u.id)}
                     </div>
                     <div style={{ color: '#5a6072', fontSize: '13px' }}>
                       {new Date(u.created_at).toLocaleString()}
