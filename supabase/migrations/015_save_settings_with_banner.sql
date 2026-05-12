@@ -144,9 +144,10 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.dismiss_changelog_banner(bigint, bigint) TO anon, authenticated;
 
--- Enable Supabase Realtime for settings/banner updates.
--- Required so every connected client receives user_launch_credentials changes immediately.
+-- Realtime fix for banner/changelog updates.
+-- Run this in Supabase SQL Editor if connected users do not receive the new banner instantly.
 ALTER TABLE public.user_launch_credentials REPLICA IDENTITY FULL;
+ALTER TABLE public.users REPLICA IDENTITY FULL;
 
 DO $$
 BEGIN
@@ -157,13 +158,9 @@ BEGIN
       AND schemaname = 'public'
       AND tablename = 'user_launch_credentials'
   ) THEN
-    ALTER PUBLICATION supabase_realtime
-    ADD TABLE public.user_launch_credentials;
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.user_launch_credentials;
   END IF;
 END $$;
-
--- Recommended because the app also listens to users updates and compares old/new values.
-ALTER TABLE public.users REPLICA IDENTITY FULL;
 
 DO $$
 BEGIN
@@ -174,7 +171,6 @@ BEGIN
       AND schemaname = 'public'
       AND tablename = 'users'
   ) THEN
-    ALTER PUBLICATION supabase_realtime
-    ADD TABLE public.users;
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.users;
   END IF;
 END $$;

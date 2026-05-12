@@ -392,7 +392,32 @@ export default function DashboardPage() {
   }, [])
 
   // Realtime listener for launch settings changes (banner/changelog updates)
+  // This updates the visible banner text immediately when Settings is saved.
   useEffect(() => {
+    const applyLaunchSettings = (row: Partial<LaunchCredential> | null) => {
+      if (!row || Number(row.id) !== LAUNCH_CREDENTIAL_ID) return false
+
+      const nextLaunchData: LaunchCredential = {
+        id: Number(row.id),
+        token: String(row.token || ''),
+        version: String(row.version || ''),
+        changelog: typeof row.changelog === 'string' ? row.changelog : '',
+        banner_id: Number(row.banner_id || 0),
+        created_at: typeof row.created_at === 'string' ? row.created_at : null,
+        updated_at: typeof row.updated_at === 'string' ? row.updated_at : null,
+      }
+
+      setLaunchData(nextLaunchData)
+
+      // Keep Settings tab fields in sync only when the admin is not actively editing them.
+      if (!(user?.role === 'admin' && activeTab === 'settings')) {
+        setSettingsVersion(nextLaunchData.version || '')
+        setChangelogText(nextLaunchData.changelog || '')
+      }
+
+      return true
+    }
+
     const channel = supabase
       .channel(`launch-settings-changes-${LAUNCH_CREDENTIAL_ID}`)
       .on(
@@ -404,27 +429,14 @@ export default function DashboardPage() {
           filter: `id=eq.${LAUNCH_CREDENTIAL_ID}`,
         },
         async (payload) => {
-          const next = payload.new as Partial<LaunchCredential> | null
+          console.log('Launch settings realtime payload:', payload)
 
-          if (next?.id === LAUNCH_CREDENTIAL_ID) {
-            const nextLaunchData: LaunchCredential = {
-              id: Number(next.id),
-              token: String(next.token || ''),
-              version: String(next.version || ''),
-              changelog: typeof next.changelog === 'string' ? next.changelog : '',
-              banner_id: Number(next.banner_id || 0),
-              created_at: typeof next.created_at === 'string' ? next.created_at : null,
-              updated_at: typeof next.updated_at === 'string' ? next.updated_at : null,
-            }
+          const applied = applyLaunchSettings(payload.new as Partial<LaunchCredential> | null)
 
-            setLaunchData(nextLaunchData)
-            setSettingsVersion(nextLaunchData.version || '')
-            setChangelogText(nextLaunchData.changelog || '')
-            return
+          // Fallback reload ensures RPC/server data is used even if payload is incomplete.
+          if (!applied) {
+            await fetchLaunchData()
           }
-
-          // Fallback kapag hindi kumpleto ang realtime payload.
-          await fetchLaunchData()
         }
       )
       .subscribe((status) => {
@@ -434,7 +446,19 @@ export default function DashboardPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [])
+  }, [user?.role, activeTab])
+
+  // Safety fallback: if Supabase Realtime misses an event, users still get the
+  // newest banner/changelog without manually refreshing the page.
+  useEffect(() => {
+    if (user?.role === 'admin' && activeTab === 'settings') return
+
+    const interval = setInterval(() => {
+      fetchLaunchData()
+    }, 3000)
+
+    return () => clearInterval(interval)
+  }, [user?.role, activeTab])
 
   // Auto-refresh page when current user's role changes
     // Auto-refresh page when current user's role or group_id changes
