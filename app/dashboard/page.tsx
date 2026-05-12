@@ -597,9 +597,8 @@ useEffect(() => {
       setSettingsVersion(result.data.version || '')
       setChangelogText(result.data.changelog || '')
       setSettingsMessage('Settings saved successfully!')
-      await fetchLaunchData()
     } else {
-      setSettingsMessage('Settings saved, but no updated row was returned.')
+      setSettingsMessage('Settings saved, then row id=1 was reloaded.')
       await fetchLaunchData()
     }
 
@@ -1595,10 +1594,40 @@ const launchButtonEnabled = canLaunch && !launching
 
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: '240px 1fr',
+                gridTemplateColumns: '160px 240px 1fr',
                 gap: '20px',
                 marginBottom: '24px',
               }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    color: '#fff',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    marginBottom: '12px',
+                  }}>
+                    Database Row ID
+                  </label>
+                  <input
+                    type="text"
+                    value={launchData?.id ?? 1}
+                    readOnly
+                    title="Only user_launch_credentials row id=1 is displayed and edited here."
+                    style={{
+                      width: '100%',
+                      background: 'rgba(10, 12, 21, 0.45)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      padding: '14px 16px',
+                      color: '#8b92a8',
+                      fontSize: '14px',
+                      fontFamily: 'monospace',
+                      outline: 'none',
+                      cursor: 'not-allowed',
+                    }}
+                  />
+                </div>
+
                 <div>
                   <label style={{
                     display: 'block',
@@ -1681,7 +1710,8 @@ const launchButtonEnabled = canLaunch && !launching
                 borderTop: '1px solid rgba(255,255,255,0.05)',
               }}>
                 <div style={{ color: '#5a6072', fontSize: '13px' }}>
-                  Current token: <span style={{ color: '#fff', fontFamily: 'monospace' }}>{launchData?.token || 'not set'}</span>
+                  Editing: <span style={{ color: '#fff', fontFamily: 'monospace' }}>public.user_launch_credentials id=1</span>
+                  <span style={{ marginLeft: '14px' }}>Token: <span style={{ color: '#fff', fontFamily: 'monospace' }}>{launchData?.token || 'not set'}</span></span>
                 </div>
                 <button
                   onClick={handleSaveSettings}
