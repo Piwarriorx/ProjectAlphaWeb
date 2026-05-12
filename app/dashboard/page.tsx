@@ -833,17 +833,30 @@ if (isPending) {
   launchLabel = 'Launch'
 }
 const launchButtonEnabled = canLaunch && !launching
+  const isUserOnline = (userId: number) => onlineUserIds.includes(userId)
+  const sortUsersByRoleAndOnline = (a: User, b: User) => {
+    const aIsAdmin = a.role === 'admin'
+    const bIsAdmin = b.role === 'admin'
+
+    if (aIsAdmin !== bIsAdmin) return aIsAdmin ? -1 : 1
+
+    const aIsOnline = isUserOnline(a.id)
+    const bIsOnline = isUserOnline(b.id)
+
+    if (aIsOnline !== bIsOnline) return aIsOnline ? -1 : 1
+
+    return a.username.localeCompare(b.username)
+  }
+  const usersTabUsers = users
+    .filter(u => u.role !== 'pending')
+    .sort(sortUsersByRoleAndOnline)
   const manageableUsers = users
     .filter(u => u.role !== 'pending')
-    .sort((a, b) => {
-      if (a.role === 'admin' && b.role !== 'admin') return -1
-      if (a.role !== 'admin' && b.role === 'admin') return 1
-      return 0
-    })
+    .sort(sortUsersByRoleAndOnline)
   const sortedGroupExpirations = [...groupExpirations].sort((a, b) => a.group_id.localeCompare(b.group_id))
 
   const renderOnlineStatus = (userId: number) => {
-    const isOnline = onlineUserIds.includes(userId)
+    const isOnline = isUserOnline(userId)
 
     return (
       <span style={{
@@ -1286,7 +1299,7 @@ const launchButtonEnabled = canLaunch && !launching
                   borderRadius: '20px',
                   fontSize: '14px',
                 }}>
-                  {users.filter(u => u.role !== 'pending').length}
+                  {usersTabUsers.length}
                 </span>
               </h2>
 
@@ -1315,7 +1328,7 @@ const launchButtonEnabled = canLaunch && !launching
                   <div>Last launch</div>
                 </div>
 
-                {users.filter(u => u.role !== 'pending').map(u => (
+                {usersTabUsers.map(u => (
                   <div key={u.id} style={{
                     display: 'grid',
                     gridTemplateColumns: 'minmax(140px, 1fr) 110px 120px 170px 200px 200px',
