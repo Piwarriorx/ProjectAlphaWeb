@@ -22,8 +22,10 @@ interface User {
 }
 
 interface LaunchCredential {
+  id: number
   token: string
   version: string
+  changelog?: string | null
 }
 
 interface GroupExpiration {
@@ -103,7 +105,7 @@ export default function DashboardPage() {
   const [files, setFiles] = useState<FileRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [time, setTime] = useState('')
-  const [activeTab, setActiveTab] = useState<'users' | 'files' | 'config' | 'management' | 'group'>('files')
+  const [activeTab, setActiveTab] = useState<'users' | 'files' | 'config' | 'settings' | 'management' | 'group'>('files')
   const [launchData, setLaunchData] = useState<LaunchCredential | null>(null)
   const [launching, setLaunching] = useState(false)
   const [onlineUserIds, setOnlineUserIds] = useState<number[]>([])
@@ -113,6 +115,10 @@ export default function DashboardPage() {
   const [configText, setConfigText] = useState('')
   const [configMessage, setConfigMessage] = useState('')
   const [savingConfig, setSavingConfig] = useState(false)
+  const [settingsVersion, setSettingsVersion] = useState('')
+  const [changelogText, setChangelogText] = useState('')
+  const [settingsMessage, setSettingsMessage] = useState('')
+  const [savingSettings, setSavingSettings] = useState(false)
   const [managementMessage, setManagementMessage] = useState('')
   const [updatingGroup, setUpdatingGroup] = useState<number | null>(null)
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([])
@@ -408,7 +414,7 @@ useEffect(() => {
   async function fetchLaunchData() {
     const { data, error } = await supabase
       .from('user_launch_credentials')
-      .select('token, version')
+      .select('id, token, version, changelog')
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
@@ -418,10 +424,14 @@ useEffect(() => {
         console.error('Error fetching launch data:', error)
       }
       setLaunchData(null)
+      setSettingsVersion('')
+      setChangelogText('')
       return
     }
 
     setLaunchData(data)
+    setSettingsVersion(data.version || '')
+    setChangelogText(data.changelog || '')
   }
 
   async function fetchFiles() {
@@ -562,6 +572,44 @@ useEffect(() => {
       setConfigMessage('Configuration saved successfully!')
     }
     setSavingConfig(false)
+  }
+
+  async function handleSaveSettings() {
+    if (!settingsVersion.trim()) {
+      setSettingsMessage('Version is required.')
+      return
+    }
+
+    if (!launchData?.id) {
+      setSettingsMessage('No launch credential row found. Please add a launch credential first.')
+      return
+    }
+
+    setSavingSettings(true)
+    setSettingsMessage('')
+
+    const { data, error } = await supabase
+      .from('user_launch_credentials')
+      .update({
+        version: settingsVersion.trim(),
+        changelog: changelogText,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', launchData.id)
+      .select('id, token, version, changelog')
+      .single()
+
+    if (error) {
+      setSettingsMessage(error.message || 'Failed to save settings.')
+    } else {
+      setLaunchData(data)
+      setSettingsVersion(data.version || '')
+      setChangelogText(data.changelog || '')
+      setSettingsMessage('Settings saved successfully!')
+    }
+
+    setSavingSettings(false)
+    setTimeout(() => setSettingsMessage(''), 3000)
   }
 
   async function handleUpdateGroup(userId: number, newGroupId: string) {
@@ -1101,6 +1149,22 @@ const launchButtonEnabled = canLaunch && !launching
               Config
             </button>
             <button
+              onClick={() => setActiveTab('settings')}
+              style={{
+                padding: '10px 24px',
+                borderRadius: '10px',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 600,
+                transition: 'all 0.2s ease',
+                background: activeTab === 'settings' ? 'rgba(255, 149, 0, 0.15)' : 'transparent',
+                color: activeTab === 'settings' ? '#ff9500' : '#5a6072',
+              }}
+            >
+              Settings
+            </button>
+            <button
               onClick={() => setActiveTab('users')}
               style={{
                 padding: '10px 24px',
@@ -1490,6 +1554,156 @@ const launchButtonEnabled = canLaunch && !launching
                   }}
                 >
                   {savingConfig ? 'Saving...' : 'Save Configuration'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Admin - Settings Tab */}
+        {user.role === 'admin' && activeTab === 'settings' && (
+          <div>
+            <div style={{
+              background: 'rgba(20, 22, 35, 0.7)',
+              border: '1px solid rgba(255, 149, 0, 0.2)',
+              borderRadius: '16px',
+              padding: '32px',
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '24px'
+              }}>
+                <div>
+                  <h2 style={{ color: '#ff9500', fontSize: '24px', margin: 0 }}>
+                    Settings
+                  </h2>
+                  <p style={{ color: '#5a6072', fontSize: '13px', margin: '6px 0 0' }}>
+                    Edit the launcher version and changelog text.
+                  </p>
+                </div>
+                {settingsMessage && (
+                  <div style={{
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    background: settingsMessage.includes('success') ? 'rgba(0, 255, 136, 0.1)' : 'rgba(255, 68, 68, 0.1)',
+                    color: settingsMessage.includes('success') ? '#00ff88' : '#ff4444',
+                    border: `1px solid ${settingsMessage.includes('success') ? 'rgba(0, 255, 136, 0.3)' : 'rgba(255, 68, 68, 0.3)'}`,
+                  }}>
+                    {settingsMessage}
+                  </div>
+                )}
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '240px 1fr',
+                gap: '20px',
+                marginBottom: '24px',
+              }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    color: '#fff',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    marginBottom: '12px',
+                  }}>
+                    Version
+                  </label>
+                  <input
+                    type="text"
+                    value={settingsVersion}
+                    onChange={(e) => setSettingsVersion(e.target.value)}
+                    placeholder="Example: 1.0"
+                    style={{
+                      width: '100%',
+                      background: 'rgba(10, 12, 21, 0.8)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      padding: '14px 16px',
+                      color: '#fff',
+                      fontSize: '14px',
+                      fontFamily: 'monospace',
+                      outline: 'none',
+                      transition: 'all 0.2s ease',
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(255, 149, 0, 0.5)'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{
+                    display: 'block',
+                    color: '#fff',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    marginBottom: '12px',
+                  }}>
+                    Changelogs
+                  </label>
+                  <textarea
+                    value={changelogText}
+                    onChange={(e) => setChangelogText(e.target.value)}
+                    placeholder="Enter changelogs here..."
+                    style={{
+                      width: '100%',
+                      minHeight: '220px',
+                      background: 'rgba(10, 12, 21, 0.8)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      padding: '16px',
+                      color: '#fff',
+                      fontSize: '14px',
+                      fontFamily: 'monospace',
+                      resize: 'vertical',
+                      outline: 'none',
+                      transition: 'all 0.2s ease',
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(255, 149, 0, 0.5)'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingTop: '20px',
+                borderTop: '1px solid rgba(255,255,255,0.05)',
+              }}>
+                <div style={{ color: '#5a6072', fontSize: '13px' }}>
+                  Current token: <span style={{ color: '#fff', fontFamily: 'monospace' }}>{launchData?.token || 'not set'}</span>
+                </div>
+                <button
+                  onClick={handleSaveSettings}
+                  disabled={savingSettings}
+                  style={{
+                    padding: '12px 28px',
+                    background: savingSettings ? '#3a3d4e' : '#ff9500',
+                    color: '#0a0c15',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: savingSettings ? 'not-allowed' : 'pointer',
+                    fontWeight: 700,
+                    fontSize: '14px',
+                    transition: 'all 0.3s ease',
+                  }}
+                >
+                  {savingSettings ? 'Saving...' : 'Save Settings'}
                 </button>
               </div>
             </div>
