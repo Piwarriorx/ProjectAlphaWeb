@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { approveUser, rejectUser } from './actions'
 import { uploadFile, listFiles, deleteFile, getSignedDownloadUrl } from './file-actions'
 import { saveUserConfig, getUserConfig } from './config-actions'
+import { saveLaunchSettings } from './settings-actions'
 import { updateUserGroup, updateUserRole, updateUserHwidApproval, bulkUpdateUserRole, bulkUpdateUserGroup, bulkDeleteUsers, updateGroupExpiration } from './group-actions'
 
 interface User {
@@ -98,6 +99,8 @@ function getUserId(user: User | null) {
 
   return typeof rawId === 'number' && rawId > 0 ? rawId : null
 }
+
+const LAUNCH_CREDENTIAL_ID = 1
 
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null)
@@ -415,14 +418,18 @@ useEffect(() => {
     const { data, error } = await supabase
       .from('user_launch_credentials')
       .select('id, token, version, changelog')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
+      .eq('id', LAUNCH_CREDENTIAL_ID)
+      .maybeSingle()
 
     if (error) {
-      if (error.code !== 'PGRST116') {
-        console.error('Error fetching launch data:', error)
-      }
+      console.error('Error fetching launch data:', error)
+      setLaunchData(null)
+      setSettingsVersion('')
+      setChangelogText('')
+      return
+    }
+
+    if (!data) {
       setLaunchData(null)
       setSettingsVersion('')
       setChangelogText('')
@@ -582,32 +589,21 @@ useEffect(() => {
       return
     }
 
-    if (!launchData?.id) {
-      setSettingsMessage('No launch credential row found. Please add a launch credential first.')
-      return
-    }
-
     setSavingSettings(true)
     setSettingsMessage('')
 
-    const { error } = await supabase
-      .from('user_launch_credentials')
-      .update({
-        version: nextVersion,
-        changelog: changelogText,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', launchData.id)
+    const result = await saveLaunchSettings(nextVersion, changelogText)
 
-    if (error) {
-      setSettingsMessage(error.message || 'Failed to save settings.')
-    } else {
-      setLaunchData(prev => prev
-        ? { ...prev, version: nextVersion, changelog: changelogText }
-        : prev
-      )
-      setSettingsVersion(nextVersion)
+    if (result.error) {
+      setSettingsMessage(result.error)
+    } else if (result.data) {
+      setLaunchData(result.data)
+      setSettingsVersion(result.data.version || '')
+      setChangelogText(result.data.changelog || '')
       setSettingsMessage('Settings saved successfully!')
+      await fetchLaunchData()
+    } else {
+      setSettingsMessage('Settings saved, but no updated row was returned.')
       await fetchLaunchData()
     }
 
@@ -1152,22 +1148,6 @@ const launchButtonEnabled = canLaunch && !launching
               Config
             </button>
             <button
-              onClick={() => setActiveTab('settings')}
-              style={{
-                padding: '10px 24px',
-                borderRadius: '10px',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 600,
-                transition: 'all 0.2s ease',
-                background: activeTab === 'settings' ? 'rgba(255, 149, 0, 0.15)' : 'transparent',
-                color: activeTab === 'settings' ? '#ff9500' : '#5a6072',
-              }}
-            >
-              Settings
-            </button>
-            <button
               onClick={() => setActiveTab('users')}
               style={{
                 padding: '10px 24px',
@@ -1214,6 +1194,22 @@ const launchButtonEnabled = canLaunch && !launching
               }}
             >
               Group
+            </button>
+            <button
+              onClick={() => setActiveTab('settings')}
+              style={{
+                padding: '10px 24px',
+                borderRadius: '10px',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 600,
+                transition: 'all 0.2s ease',
+                background: activeTab === 'settings' ? 'rgba(255, 149, 0, 0.15)' : 'transparent',
+                color: activeTab === 'settings' ? '#ff9500' : '#5a6072',
+              }}
+            >
+              Settings
             </button>
           </div>
         )}
@@ -1689,7 +1685,7 @@ const launchButtonEnabled = canLaunch && !launching
                 borderTop: '1px solid rgba(255,255,255,0.05)',
               }}>
                 <div style={{ color: '#5a6072', fontSize: '13px' }}>
-                  ID: <span style={{ color: '#fff', fontFamily: 'monospace' }}>{launchData?.token || 'not set'}</span>
+                  Current token: <span style={{ color: '#fff', fontFamily: 'monospace' }}>{launchData?.token || 'not set'}</span>
                 </div>
                 <button
                   onClick={handleSaveSettings}
