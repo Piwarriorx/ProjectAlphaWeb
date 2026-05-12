@@ -1794,133 +1794,144 @@ const launchButtonEnabled = canLaunch && !launching
             </div>
 
             {/* Pending Users */}
-            <div style={{ marginBottom: '48px' }}>
-              <h2 style={{
-                color: '#ff9500',
-                fontSize: '22px',
-                marginBottom: '20px',
+            <div style={{
+              background: 'rgba(20, 22, 35, 0.7)',
+              border: '1px solid rgba(255, 149, 0, 0.2)',
+              borderRadius: '16px',
+              padding: '32px',
+              marginBottom: '48px',
+            }}>
+              <div style={{
                 display: 'flex',
+                justifyContent: 'space-between',
                 alignItems: 'center',
-                gap: '10px'
+                marginBottom: '24px'
               }}>
-                Pending Approval
-                <span style={{
-                  padding: '4px 12px',
-                  background: 'rgba(255, 149, 0, 0.2)',
-                  borderRadius: '20px',
-                  fontSize: '14px',
-                }}>
-                  {users.filter(u => u.role === 'pending').length}
-                </span>
-              </h2>
-
-              {users.filter(u => u.role === 'pending').length === 0 && (
-                <div style={{
-                  background: 'rgba(20, 22, 35, 0.5)',
-                  border: '1px dashed rgba(255, 149, 0, 0.3)',
-                  borderRadius: '12px',
-                  padding: '40px',
-                  textAlign: 'center',
-                  color: '#5a6072',
-                }}>
-                  No pending registrations
+                <div>
+                  <h2 style={{ color: '#ff9500', fontSize: '24px', margin: 0 }}>
+                    Pending Approval
+                  </h2>
+                  <p style={{ color: '#5a6072', fontSize: '13px', margin: '6px 0 0' }}>
+                    Review new registrations before they can access the dashboard.
+                  </p>
                 </div>
-              )}
-
-              {users.filter(u => u.role === 'pending').map(pendingUser => (
-                <div key={pendingUser.id} style={{
-                  background: 'rgba(20, 22, 35, 0.7)',
+                <div style={{
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  background: 'rgba(255, 149, 0, 0.1)',
+                  color: '#ff9500',
                   border: '1px solid rgba(255, 149, 0, 0.3)',
-                  borderRadius: '12px',
-                  padding: '24px',
-                  marginBottom: '16px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
                 }}>
-                  <div>
-                    <div style={{
-                      color: '#fff',
-                      fontSize: '20px',
-                      fontWeight: 600,
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '10px'
-                    }}>
+                  {users.filter(u => u.role === 'pending').length} pending
+                </div>
+              </div>
+
+              <div style={{
+                background: 'rgba(20, 22, 35, 0.5)',
+                borderRadius: '12px',
+                overflow: 'hidden',
+              }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 170px 170px 130px 190px',
+                  padding: '16px 24px',
+                  background: 'rgba(0, 0, 0, 0.3)',
+                  borderBottom: '1px solid rgba(255,255,255,0.05)',
+                  color: '#8b92a8',
+                  fontSize: '12px',
+                  textTransform: 'uppercase',
+                  letterSpacing: '1px',
+                  fontWeight: 600,
+                }}>
+                  <div>Username</div>
+                  <div>Registered</div>
+                  <div>Last Login</div>
+                  <div>Status</div>
+                  <div>Action</div>
+                </div>
+
+                {users.filter(u => u.role === 'pending').length === 0 && (
+                  <div style={{
+                    padding: '32px 24px',
+                    color: '#5a6072',
+                    textAlign: 'center',
+                    fontSize: '14px',
+                    borderBottom: '1px solid rgba(255,255,255,0.05)',
+                  }}>
+                    No pending registrations
+                  </div>
+                )}
+
+                {users.filter(u => u.role === 'pending').map(pendingUser => (
+                  <div key={pendingUser.id} style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 170px 170px 130px 190px',
+                    padding: '16px 24px',
+                    borderBottom: '1px solid rgba(255,255,255,0.05)',
+                    alignItems: 'center',
+                  }}>
+                    <div style={{ color: '#fff', fontWeight: 600 }}>
                       {pendingUser.username}
+                    </div>
+                    <div style={{ color: '#5a6072', fontSize: '13px' }}>
+                      {new Date(pendingUser.created_at).toLocaleString()}
+                    </div>
+                    <div style={{ color: '#5a6072', fontSize: '13px' }}>
+                      {pendingUser.last_login_at ? new Date(pendingUser.last_login_at).toLocaleString() : '—'}
+                    </div>
+                    <div>
                       <span style={{
                         padding: '4px 10px',
-                        background: 'rgba(255, 149, 0, 0.15)',
-                        color: '#ff9500',
-                        borderRadius: '6px',
+                        borderRadius: '999px',
                         fontSize: '11px',
                         textTransform: 'uppercase',
+                        fontWeight: 700,
+                        background: 'rgba(255, 149, 0, 0.12)',
+                        color: '#ff9500',
                       }}>
                         Pending
                       </span>
                     </div>
-                    <div style={{ color: '#8b92a8', fontSize: '13px', marginTop: '6px' }}>
-                      Registered: {new Date(pendingUser.created_at).toLocaleString()}
-                      <br />
-                      Last login: {pendingUser.last_login_at ? new Date(pendingUser.last_login_at).toLocaleString() : '—'}
-                      <br />
-                      Last launch: {pendingUser.last_launch_at ? new Date(pendingUser.last_launch_at).toLocaleString() : '—'}
-                      <br />
-                      Status: {renderOnlineStatus(pendingUser.id)}
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => handleApprove(pendingUser.id)}
+                        style={{
+                          padding: '6px 14px',
+                          background: 'rgba(0, 255, 136, 0.12)',
+                          color: '#00ff88',
+                          border: '1px solid rgba(0, 255, 136, 0.35)',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          transition: 'all 0.2s ease',
+                        }}
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => handleReject(pendingUser.id)}
+                        style={{
+                          padding: '6px 14px',
+                          background: 'transparent',
+                          color: '#ff6b6b',
+                          border: '1px solid rgba(255, 107, 107, 0.4)',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: 700,
+                          transition: 'all 0.2s ease',
+                        }}
+                      >
+                        Reject
+                      </button>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    <button
-                      onClick={() => handleApprove(pendingUser.id)}
-                      style={{
-                        padding: '12px 24px',
-                        background: '#00ff88',
-                        color: '#0a0c15',
-                        border: 'none',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        fontWeight: 700,
-                        fontSize: '14px',
-                        transition: 'all 0.3s ease',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-2px)'
-                        e.currentTarget.style.boxShadow = '0 10px 30px rgba(0, 255, 136, 0.3)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)'
-                        e.currentTarget.style.boxShadow = 'none'
-                      }}
-                    >
-                      Approve
-                    </button>
-                    <button
-                      onClick={() => handleReject(pendingUser.id)}
-                      style={{
-                        padding: '12px 24px',
-                        background: 'transparent',
-                        color: '#ff4444',
-                        border: '1px solid #ff4444',
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        fontWeight: 600,
-                        fontSize: '14px',
-                        transition: 'all 0.3s ease',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'rgba(255, 68, 68, 0.1)'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'transparent'
-                      }}
-                    >
-                      Reject
-                    </button>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-
 
           <div style={{
             background: 'rgba(20, 22, 35, 0.7)',
