@@ -1000,13 +1000,25 @@ useEffect(() => {
   const hasApprovedHwid = currentUserRow?.role === 'admin' || currentUserRow?.hwid_approved === true
 
   // Get user's group and check expiration
-  const userGroupId = currentUserRow?.group_id || user?.group_id || null
-  const userGroupExpiration = userGroupId
-    ? groupExpirations.find(ge => ge.group_id === String(userGroupId))
+  const rawUserGroupId =
+  currentUserRow !== null && currentUserRow !== undefined
+    ? currentUserRow.group_id
+    : user?.group_id
+
+const userGroupId =
+  rawUserGroupId && String(rawUserGroupId).trim() !== 'not set'
+    ? String(rawUserGroupId).trim()
     : null
-  const isGroupExpired = userGroupExpiration
-    ? new Date(userGroupExpiration.expiretime).getTime() <= Date.now()
-    : false
+
+const hasAssignedGroup = Boolean(userGroupId)
+
+const userGroupExpiration = hasAssignedGroup
+  ? groupExpirations.find(ge => ge.group_id === userGroupId)
+  : null
+
+const isGroupExpired = userGroupExpiration
+  ? new Date(userGroupExpiration.expiretime).getTime() <= Date.now()
+  : false
 
   const launchUrl =
     launchData && currentHwid
@@ -1015,12 +1027,15 @@ useEffect(() => {
 
   // Disable launch if group is expired
   const isPending = user?.role === 'pending'
-const canLaunch = Boolean(launchUrl) && hasApprovedHwid && !isGroupExpired && !isPending
+const canLaunch = Boolean(launchUrl) && hasApprovedHwid && hasAssignedGroup && Boolean(userGroupExpiration) && !isGroupExpired && !isPending
 
-let launchLabel: string
 if (isPending) {
   launchLabel = 'Pending approval'
 } else if (!launchUrl) {
+  launchLabel = 'Launch unavailable'
+} else if (!hasAssignedGroup) {
+  launchLabel = 'Launch unavailable'
+} else if (!userGroupExpiration) {
   launchLabel = 'Launch unavailable'
 } else if (isGroupExpired) {
   launchLabel = 'Launch unavailable'
@@ -1031,6 +1046,7 @@ if (isPending) {
 } else {
   launchLabel = 'Launch'
 }
+
 const launchButtonEnabled = canLaunch && !launching
   const isUserOnline = (userId: number) => onlineUserIds.includes(userId)
   const sortUsersByRoleAndOnline = (a: User, b: User) => {
