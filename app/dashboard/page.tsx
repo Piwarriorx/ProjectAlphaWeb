@@ -1183,7 +1183,7 @@ const launchButtonEnabled = canLaunch && !launching
                   textTransform: 'uppercase',
                   marginBottom: '8px',
                 }}>
-                  New Update Available • Version {launchData?.version}
+                  New Update Available • PHT {time}
                 </div>
 
                 <div style={{
