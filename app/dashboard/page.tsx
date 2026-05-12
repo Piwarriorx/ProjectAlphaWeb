@@ -72,6 +72,16 @@ function formatDateTime(value: string) {
   })
 }
 
+function formatTimeOnly(value: Date) {
+  return value.toLocaleTimeString('en-PH', {
+    timeZone: 'Asia/Manila',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+  })
+}
+
 function formatRemainingTime(expiretime: string) {
   const diff = new Date(expiretime).getTime() - Date.now()
   if (Number.isNaN(diff)) return 'Invalid date'
@@ -112,6 +122,7 @@ export default function DashboardPage() {
   const [files, setFiles] = useState<FileRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [time, setTime] = useState('')
+  const [serverTimeOffsetMs, setServerTimeOffsetMs] = useState(0)
   const [activeTab, setActiveTab] = useState<'users' | 'files' | 'config' | 'settings' | 'management' | 'group'>('files')
   const [launchData, setLaunchData] = useState<LaunchCredential | null>(null)
   const [launching, setLaunching] = useState(false)
@@ -146,18 +157,57 @@ export default function DashboardPage() {
   const supabase = createClient()
 
   useEffect(() => {
-    const update = () => {
-      setTime(
-        new Date().toLocaleTimeString('en-PH', {
-          timeZone: 'Asia/Manila',
-          hour12: true,
-        })
-      )
+  let intervalId: ReturnType<typeof setInterval> | null = null
+  let cancelled = false
+
+  async function syncServerTime() {
+    const { data, error } = await supabase.rpc('get_server_time')
+
+    if (cancelled) return
+
+    if (error) {
+      console.error('Error fetching server time:', error)
+
+      const updateLocalFallback = () => {
+        setTime(formatTimeOnly(new Date()))
+      }
+
+      updateLocalFallback()
+      intervalId = setInterval(updateLocalFallback, 1000)
+      return
     }
-    update()
-    const id = setInterval(update, 1000)
-    return () => clearInterval(id)
-  }, [])
+
+    const row = Array.isArray(data) ? data[0] : data
+    const serverTimeValue = row?.server_time
+
+    if (!serverTimeValue) {
+      const updateLocalFallback = () => {
+        setTime(formatTimeOnly(new Date()))
+      }
+
+      updateLocalFallback()
+      intervalId = setInterval(updateLocalFallback, 1000)
+      return
+    }
+
+    const offsetMs = new Date(serverTimeValue).getTime() - Date.now()
+    setServerTimeOffsetMs(offsetMs)
+
+    const updateServerClock = () => {
+      setTime(formatTimeOnly(new Date(Date.now() + offsetMs)))
+    }
+
+    updateServerClock()
+    intervalId = setInterval(updateServerClock, 1000)
+  }
+
+  syncServerTime()
+
+  return () => {
+    cancelled = true
+    if (intervalId) clearInterval(intervalId)
+  }
+}, [])
 
   useEffect(() => {
     if (!user) return
