@@ -1680,6 +1680,9 @@ const launchButtonEnabled = canLaunch && !launching
                 paddingTop: '20px',
                 borderTop: '1px solid rgba(255,255,255,0.05)',
               }}>
+                <div style={{ color: '#5a6072', fontSize: '13px' }}>
+                  ID: <span style={{ color: '#fff', fontFamily: 'monospace' }}>{launchData?.token || 'not set'}</span></span>
+                </div>
                 <button
                   onClick={handleSaveSettings}
                   disabled={savingSettings}
