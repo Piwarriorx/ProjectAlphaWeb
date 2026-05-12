@@ -1040,9 +1040,9 @@ useEffect(() => {
   } else if (!hasApprovedHwid) {
     launchLabel = 'Launch unavailable'
   } else if (!hasAssignedGroup) {
-    launchLabel = 'No group assigned'
+    launchLabel = 'Launch unavailable'
   } else if (!userGroupExpiration) {
-    launchLabel = 'Group unavailable'
+    launchLabel = 'Launch unavailable'
   } else if (isGroupExpired) {
     launchLabel = 'Launch unavailable'
   } else if (launching) {
