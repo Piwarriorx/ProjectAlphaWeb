@@ -29,6 +29,8 @@ interface LaunchCredential {
   version: string
   changelog?: string | null
   banner_id?: number | null
+  created_at?: string | null
+  updated_at?: string | null
 }
 
 interface GroupExpiration {
@@ -1183,7 +1185,7 @@ const launchButtonEnabled = canLaunch && !launching
                   textTransform: 'uppercase',
                   marginBottom: '8px',
                 }}>
-                  New Update Available • PHT {time}
+                  New Update Available • {launchData?.updated_at ? formatDateTime(launchData.updated_at) : 'Update time unavailable'}
                 </div>
 
                 <div style={{
