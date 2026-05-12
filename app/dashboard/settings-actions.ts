@@ -8,7 +8,6 @@ type LaunchSettings = {
   version: string
   changelog: string | null
   banner_id: number
-  show_launch_debug: boolean
   created_at?: string | null
   updated_at?: string | null
 }
@@ -31,7 +30,6 @@ function normalizeLaunchSettingsRow(data: unknown): LaunchSettings | null {
     version: String(value.version || ''),
     changelog: typeof value.changelog === 'string' ? value.changelog : '',
     banner_id: Number(value.banner_id || 0),
-    show_launch_debug: value.show_launch_debug === true,
     created_at: typeof value.created_at === 'string' ? value.created_at : null,
     updated_at: typeof value.updated_at === 'string' ? value.updated_at : null,
   }
@@ -52,7 +50,7 @@ export async function getLaunchSettings(): Promise<LaunchSettingsResult> {
   if (!row || row.id !== 1) {
     return {
       data: null,
-      error: 'No launch settings found for user_launch_credentials id=1. Run the launch settings migration first.',
+      error: 'No launch settings found for user_launch_credentials id=1. Run the launch_settings_id_1_only.sql migration first.',
     }
   }
 
@@ -61,8 +59,7 @@ export async function getLaunchSettings(): Promise<LaunchSettingsResult> {
 
 export async function saveLaunchSettings(
   version: string,
-  changelog: string,
-  showLaunchDebug: boolean
+  changelog: string
 ): Promise<LaunchSettingsResult> {
   const nextVersion = version.trim()
 
@@ -73,12 +70,12 @@ export async function saveLaunchSettings(
   const supabase = await createServerSupabase()
 
   // Always edit only public.user_launch_credentials row id=1.
-  // banner_id increments only when version/changelog changes.
-  // Toggling launch debug alone does not create a new changelog banner.
+  // This RPC does not need to return a row; after saving, we reload id=1.
+  // The SQL migration increments banner_id every successful settings save,
+  // so users will see the latest changelog until they dismiss it.
   const { error } = await supabase.rpc('update_launch_settings', {
     p_version: nextVersion,
     p_changelog: changelog || '',
-    p_show_launch_debug: showLaunchDebug,
   })
 
   if (error) {
