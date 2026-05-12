@@ -394,20 +394,42 @@ export default function DashboardPage() {
   // Realtime listener for launch settings changes (banner/changelog updates)
   useEffect(() => {
     const channel = supabase
-      .channel('launch-settings-changes')
+      .channel(`launch-settings-changes-${LAUNCH_CREDENTIAL_ID}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'user_launch_credentials',
-          filter: `id=eq.${LAUNCH_CREDENTIAL_ID}`
+          filter: `id=eq.${LAUNCH_CREDENTIAL_ID}`,
         },
-        () => {
-          fetchLaunchData()
+        async (payload) => {
+          const next = payload.new as Partial<LaunchCredential> | null
+
+          if (next?.id === LAUNCH_CREDENTIAL_ID) {
+            const nextLaunchData: LaunchCredential = {
+              id: Number(next.id),
+              token: String(next.token || ''),
+              version: String(next.version || ''),
+              changelog: typeof next.changelog === 'string' ? next.changelog : '',
+              banner_id: Number(next.banner_id || 0),
+              created_at: typeof next.created_at === 'string' ? next.created_at : null,
+              updated_at: typeof next.updated_at === 'string' ? next.updated_at : null,
+            }
+
+            setLaunchData(nextLaunchData)
+            setSettingsVersion(nextLaunchData.version || '')
+            setChangelogText(nextLaunchData.changelog || '')
+            return
+          }
+
+          // Fallback kapag hindi kumpleto ang realtime payload.
+          await fetchLaunchData()
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        console.log('Launch settings realtime status:', status)
+      })
 
     return () => {
       supabase.removeChannel(channel)

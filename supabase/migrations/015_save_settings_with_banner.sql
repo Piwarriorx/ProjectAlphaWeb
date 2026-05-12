@@ -143,3 +143,38 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.dismiss_changelog_banner(bigint, bigint) TO anon, authenticated;
+
+-- Enable Supabase Realtime for settings/banner updates.
+-- Required so every connected client receives user_launch_credentials changes immediately.
+ALTER TABLE public.user_launch_credentials REPLICA IDENTITY FULL;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'user_launch_credentials'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime
+    ADD TABLE public.user_launch_credentials;
+  END IF;
+END $$;
+
+-- Recommended because the app also listens to users updates and compares old/new values.
+ALTER TABLE public.users REPLICA IDENTITY FULL;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'users'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime
+    ADD TABLE public.users;
+  END IF;
+END $$;
