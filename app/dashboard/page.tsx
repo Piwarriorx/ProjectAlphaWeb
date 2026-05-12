@@ -15,6 +15,7 @@ interface User {
   role: string
   created_at: string
   last_login_at?: string | null
+  last_launch_at?: string | null
   group_id?: string | null
   hwid?: string | null
   hwid_approved?: boolean | null
@@ -104,6 +105,7 @@ export default function DashboardPage() {
   const [time, setTime] = useState('')
   const [activeTab, setActiveTab] = useState<'users' | 'files' | 'config' | 'management' | 'group'>('files')
   const [launchData, setLaunchData] = useState<LaunchCredential | null>(null)
+  const [launching, setLaunching] = useState(false)
   const [groupExpirations, setGroupExpirations] = useState<GroupExpiration[]>([])
   const [uploadMessage, setUploadMessage] = useState('')
   const [uploading, setUploading] = useState(false)
@@ -341,7 +343,7 @@ export default function DashboardPage() {
   async function fetchUsers() {
     const { data, error } = await supabase
       .from('users')
-      .select('id, username, role, created_at, last_login_at, group_id, hwid, hwid_approved')
+      .select('id, username, role, created_at, last_login_at, last_launch_at, group_id, hwid, hwid_approved')
       .order('created_at', { ascending: false })
 
     setUsers(data || [])
@@ -697,6 +699,57 @@ useEffect(() => {
     }
   }
 
+  async function handleLaunch() {
+    if (!canLaunch) {
+      alert(`Launch blocked!\n\ncanLaunch: ${canLaunch}\nlaunchUrl: ${launchUrl || 'empty'}\nhasApprovedHwid: ${hasApprovedHwid}\nisGroupExpired: ${isGroupExpired}\nuserGroupId: ${userGroupId || 'none'}\nuserGroupExpiration: ${userGroupExpiration ? userGroupExpiration.expiretime : 'none'}`)
+      return
+    }
+
+    const currentUserId = getUserId(user)
+    if (!currentUserId || !launchData || !launchUrl) {
+      alert('Launch unavailable. Please refresh and try again.')
+      return
+    }
+
+    setLaunching(true)
+
+    try {
+      const { data, error } = await (supabase as any).rpc('record_user_launch', {
+        p_user_id: currentUserId,
+        p_hwid: currentHwid || null,
+        p_group_id: userGroupId ? String(userGroupId) : null,
+        p_token_version: launchData.version || null,
+        p_user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+      })
+
+      if (error) {
+        console.error('Error logging launch:', error)
+        alert(error.message || 'Failed to log launch. Please try again.')
+        return
+      }
+
+      const loggedLaunchAt = Array.isArray(data) && data[0]?.last_launch_at
+        ? data[0].last_launch_at
+        : new Date().toISOString()
+
+      setUsers(prev => prev.map(u =>
+        u.id === currentUserId
+          ? { ...u, last_launch_at: loggedLaunchAt }
+          : u
+      ))
+
+      if (user) {
+        const updatedUser = { ...user, last_launch_at: loggedLaunchAt }
+        setUser(updatedUser)
+        localStorage.setItem('ezcrosshair_user', JSON.stringify(updatedUser))
+      }
+
+      window.location.href = launchUrl
+    } finally {
+      setLaunching(false)
+    }
+  }
+
   function logout() {
     localStorage.removeItem('ezcrosshair_user')
     window.location.href = '/login'
@@ -734,9 +787,12 @@ if (isPending) {
   launchLabel = 'Launch unavailable'
 } else if (!hasApprovedHwid) {
   launchLabel = 'Launch unavailable'
+} else if (launching) {
+  launchLabel = 'Launching...'
 } else {
   launchLabel = 'Launch'
 }
+const launchButtonEnabled = canLaunch && !launching
   const manageableUsers = users
     .filter(u => u.role !== 'pending')
     .sort((a, b) => {
@@ -838,23 +894,16 @@ if (isPending) {
 
                     <div style={{ display: 'flex', justifyContent: 'center' }}>
             <button
-                            onClick={() => {
-                if (!canLaunch) {
-                  alert(`Launch blocked!\n\ncanLaunch: ${canLaunch}\nlaunchUrl: ${launchUrl || 'empty'}\nhasApprovedHwid: ${hasApprovedHwid}\nisGroupExpired: ${isGroupExpired}\nuserGroupId: ${userGroupId || 'none'}\nuserGroupExpiration: ${userGroupExpiration ? userGroupExpiration.expiretime : 'none'}`)
-                  return
-                }
-                alert(`Launching!\n\nURL: ${launchUrl}`)
-                window.location.href = launchUrl
-              }}
-              disabled={!canLaunch}
+              onClick={handleLaunch}
+              disabled={!launchButtonEnabled}
               style={{
                 minWidth: '200px',
                 padding: '12px 24px',
-                background: canLaunch ? 'rgba(0, 255, 136, 0.12)' : 'rgba(58, 61, 78, 0.5)',
-                color: canLaunch ? '#00ff88' : '#5a6072',
-                border: `1.5px solid ${canLaunch ? 'rgba(0, 255, 136, 0.35)' : 'rgba(90, 96, 114, 0.35)'}`,
+                background: launchButtonEnabled ? 'rgba(0, 255, 136, 0.12)' : 'rgba(58, 61, 78, 0.5)',
+                color: launchButtonEnabled ? '#00ff88' : '#5a6072',
+                border: `1.5px solid ${launchButtonEnabled ? 'rgba(0, 255, 136, 0.35)' : 'rgba(90, 96, 114, 0.35)'}`,
                 borderRadius: '10px',
-                cursor: canLaunch ? 'pointer' : 'not-allowed',
+                cursor: launchButtonEnabled ? 'pointer' : 'not-allowed',
                 fontSize: '13px',
                 fontWeight: 700,
                 letterSpacing: '0.8px',
@@ -866,12 +915,12 @@ if (isPending) {
                 gap: '4px',
               }}
               onMouseEnter={(e) => {
-                if (!canLaunch) return
+                if (!launchButtonEnabled) return
                 e.currentTarget.style.background = 'rgba(0, 255, 136, 0.18)'
                 e.currentTarget.style.borderColor = 'rgba(0, 255, 136, 0.55)'
               }}
               onMouseLeave={(e) => {
-                if (!canLaunch) return
+                if (!launchButtonEnabled) return
                 e.currentTarget.style.background = 'rgba(0, 255, 136, 0.12)'
                 e.currentTarget.style.borderColor = 'rgba(0, 255, 136, 0.35)'
               }}
@@ -1091,6 +1140,8 @@ if (isPending) {
                       Registered: {new Date(pendingUser.created_at).toLocaleString()}
                       <br />
                       Last login: {pendingUser.last_login_at ? new Date(pendingUser.last_login_at).toLocaleString() : '—'}
+                      <br />
+                      Last launch: {pendingUser.last_launch_at ? new Date(pendingUser.last_launch_at).toLocaleString() : '—'}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '12px' }}>
@@ -1173,7 +1224,7 @@ if (isPending) {
               }}>
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: '1fr 120px 200px 240px',
+                  gridTemplateColumns: '1fr 120px 190px 220px 220px',
                   padding: '16px 24px',
                   background: 'rgba(0, 0, 0, 0.3)',
                   borderBottom: '1px solid rgba(255,255,255,0.05)',
@@ -1187,12 +1238,13 @@ if (isPending) {
                   <div>Role</div>
                   <div>Registered</div>
                   <div>Last login</div>
+                  <div>Last launch</div>
                 </div>
 
                 {users.filter(u => u.role !== 'pending').map(u => (
                   <div key={u.id} style={{
                     display: 'grid',
-                    gridTemplateColumns: '1fr 120px 200px 240px',
+                    gridTemplateColumns: '1fr 120px 190px 220px 220px',
                     padding: '16px 24px',
                     borderBottom: '1px solid rgba(255,255,255,0.05)',
                     alignItems: 'center',
@@ -1220,6 +1272,9 @@ if (isPending) {
                     </div>
                     <div style={{ color: '#5a6072', fontSize: '13px' }}>
                       {u.last_login_at ? new Date(u.last_login_at).toLocaleString() : '—'}
+                    </div>
+                    <div style={{ color: '#5a6072', fontSize: '13px' }}>
+                      {u.last_launch_at ? new Date(u.last_launch_at).toLocaleString() : '—'}
                     </div>
                   </div>
                 ))}
