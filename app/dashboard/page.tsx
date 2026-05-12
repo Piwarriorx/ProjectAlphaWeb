@@ -1635,42 +1635,43 @@ const launchButtonEnabled = canLaunch && !launching
                   />
                 </div>
 
-                <div>
-                  <label style={{
-                    display: 'block',
-                    color: '#fff',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    marginBottom: '12px',
-                  }}>
-                    Changelogs
-                  </label>
-                  <textarea
-                    value={changelogText}
-                    onChange={(e) => setChangelogText(e.target.value)}
-                    placeholder="Enter changelogs here..."
-                    style={{
-                      width: '100%',
-                      minHeight: '220px',
-                      background: 'rgba(10, 12, 21, 0.8)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '8px',
-                      padding: '16px',
-                      color: '#fff',
-                      fontSize: '14px',
-                      fontFamily: 'monospace',
-                      resize: 'vertical',
-                      outline: 'none',
-                      transition: 'all 0.2s ease',
-                    }}
-                    onFocus={(e) => {
-                      e.currentTarget.style.borderColor = 'rgba(255, 149, 0, 0.5)'
-                    }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
-                    }}
-                  />
-                </div>
+                <div style={{ gridColumn: '1 / -1', width: '100%' }}>
+  <label style={{
+    display: 'block',
+    color: '#fff',
+    fontSize: '14px',
+    fontWeight: 600,
+    marginBottom: '12px',
+  }}>
+    Changelogs
+  </label>
+  <textarea
+    value={changelogText}
+    onChange={(e) => setChangelogText(e.target.value)}
+    placeholder="Enter changelogs here..."
+    style={{
+      width: '100%',
+      minHeight: '220px',
+      background: 'rgba(10, 12, 21, 0.8)',
+      border: '1px solid rgba(255, 255, 255, 0.1)',
+      borderRadius: '8px',
+      padding: '16px',
+      color: '#fff',
+      fontSize: '14px',
+      fontFamily: 'monospace',
+      resize: 'vertical',
+      outline: 'none',
+      transition: 'all 0.2s ease',
+      boxSizing: 'border-box',
+    }}
+    onFocus={(e) => {
+      e.currentTarget.style.borderColor = 'rgba(255, 149, 0, 0.5)'
+    }}
+    onBlur={(e) => {
+      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
+    }}
+  />
+</div>
               </div>
 
               <div style={{
