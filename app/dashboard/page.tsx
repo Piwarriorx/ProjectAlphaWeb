@@ -575,7 +575,9 @@ useEffect(() => {
   }
 
   async function handleSaveSettings() {
-    if (!settingsVersion.trim()) {
+    const nextVersion = settingsVersion.trim()
+
+    if (!nextVersion) {
       setSettingsMessage('Version is required.')
       return
     }
@@ -588,24 +590,25 @@ useEffect(() => {
     setSavingSettings(true)
     setSettingsMessage('')
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('user_launch_credentials')
       .update({
-        version: settingsVersion.trim(),
+        version: nextVersion,
         changelog: changelogText,
         updated_at: new Date().toISOString(),
       })
       .eq('id', launchData.id)
-      .select('id, token, version, changelog')
-      .single()
 
     if (error) {
       setSettingsMessage(error.message || 'Failed to save settings.')
     } else {
-      setLaunchData(data)
-      setSettingsVersion(data.version || '')
-      setChangelogText(data.changelog || '')
+      setLaunchData(prev => prev
+        ? { ...prev, version: nextVersion, changelog: changelogText }
+        : prev
+      )
+      setSettingsVersion(nextVersion)
       setSettingsMessage('Settings saved successfully!')
+      await fetchLaunchData()
     }
 
     setSavingSettings(false)
@@ -1686,7 +1689,7 @@ const launchButtonEnabled = canLaunch && !launching
                 borderTop: '1px solid rgba(255,255,255,0.05)',
               }}>
                 <div style={{ color: '#5a6072', fontSize: '13px' }}>
-                  Current token: <span style={{ color: '#fff', fontFamily: 'monospace' }}>{launchData?.token || 'not set'}</span>
+                  ID: <span style={{ color: '#fff', fontFamily: 'monospace' }}>{launchData?.token || 'not set'}</span>
                 </div>
                 <button
                   onClick={handleSaveSettings}
