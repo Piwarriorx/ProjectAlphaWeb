@@ -29,6 +29,7 @@ interface LaunchCredential {
   version: string
   changelog?: string | null
   banner_id?: number | null
+  show_launch_debug?: boolean | null
   created_at?: string | null
   updated_at?: string | null
 }
@@ -126,6 +127,7 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<'users' | 'files' | 'config' | 'settings' | 'management' | 'group'>('files')
   const [launchData, setLaunchData] = useState<LaunchCredential | null>(null)
   const [launching, setLaunching] = useState(false)
+  const [launchDebugCopied, setLaunchDebugCopied] = useState(false)
   const [onlineUserIds, setOnlineUserIds] = useState<number[]>([])
   const [groupExpirations, setGroupExpirations] = useState<GroupExpiration[]>([])
   const [uploadMessage, setUploadMessage] = useState('')
@@ -135,6 +137,7 @@ export default function DashboardPage() {
   const [savingConfig, setSavingConfig] = useState(false)
   const [settingsVersion, setSettingsVersion] = useState('')
   const [changelogText, setChangelogText] = useState('')
+  const [showLaunchDebugSetting, setShowLaunchDebugSetting] = useState(false)
   const [settingsMessage, setSettingsMessage] = useState('')
   const [savingSettings, setSavingSettings] = useState(false)
   const [managementMessage, setManagementMessage] = useState('')
@@ -403,6 +406,7 @@ export default function DashboardPage() {
         version: String(row.version || ''),
         changelog: typeof row.changelog === 'string' ? row.changelog : '',
         banner_id: Number(row.banner_id || 0),
+        show_launch_debug: row.show_launch_debug === true,
         created_at: typeof row.created_at === 'string' ? row.created_at : null,
         updated_at: typeof row.updated_at === 'string' ? row.updated_at : null,
       }
@@ -413,6 +417,7 @@ export default function DashboardPage() {
       if (!(user?.role === 'admin' && activeTab === 'settings')) {
         setSettingsVersion(nextLaunchData.version || '')
         setChangelogText(nextLaunchData.changelog || '')
+        setShowLaunchDebugSetting(nextLaunchData.show_launch_debug === true)
       }
 
       return true
@@ -545,6 +550,7 @@ useEffect(() => {
       setLaunchData(null)
       setSettingsVersion('')
       setChangelogText('')
+      setShowLaunchDebugSetting(false)
       return
     }
 
@@ -552,12 +558,14 @@ useEffect(() => {
       setLaunchData(null)
       setSettingsVersion('')
       setChangelogText('')
+      setShowLaunchDebugSetting(false)
       return
     }
 
     setLaunchData(result.data)
     setSettingsVersion(result.data.version || '')
     setChangelogText(result.data.changelog || '')
+    setShowLaunchDebugSetting(result.data.show_launch_debug === true)
   }
 
   async function fetchFiles() {
@@ -711,7 +719,7 @@ useEffect(() => {
     setSavingSettings(true)
     setSettingsMessage('')
 
-    const result = await saveLaunchSettings(nextVersion, changelogText)
+    const result = await saveLaunchSettings(nextVersion, changelogText, showLaunchDebugSetting)
 
     if (result.error) {
       setSettingsMessage(result.error)
@@ -719,6 +727,7 @@ useEffect(() => {
       setLaunchData(result.data)
       setSettingsVersion(result.data.version || '')
       setChangelogText(result.data.changelog || '')
+      setShowLaunchDebugSetting(result.data.show_launch_debug === true)
       setSettingsMessage('Settings saved successfully!')
     } else {
       setSettingsMessage('Settings saved, then row id=1 was reloaded.')
@@ -985,6 +994,26 @@ useEffect(() => {
     }
   }
 
+  async function handleCopyLaunchUrl() {
+    if (!launchUrl) {
+      alert('Launch URL is empty. Check token, HWID, version, approval, and group expiration.')
+      return
+    }
+
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(launchUrl)
+        setLaunchDebugCopied(true)
+        setTimeout(() => setLaunchDebugCopied(false), 1500)
+        return
+      }
+    } catch (err) {
+      console.error('Failed to copy launch URL:', err)
+    }
+
+    window.prompt('Copy launch URL:', launchUrl)
+  }
+
   function logout() {
     localStorage.removeItem('ezcrosshair_user')
     window.location.href = '/login'
@@ -1175,7 +1204,14 @@ const launchButtonEnabled = canLaunch && !launching
             </div>
           </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                    <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '10px',
+            minWidth: '280px',
+          }}>
             <button
               onClick={handleLaunch}
               disabled={!launchButtonEnabled}
@@ -1222,6 +1258,79 @@ const launchButtonEnabled = canLaunch && !launching
                 </span>
               )}
             </button>
+
+            {launchData?.show_launch_debug === true && (
+            <div style={{
+              width: '100%',
+              maxWidth: '420px',
+              padding: '10px 12px',
+              borderRadius: '10px',
+              background: 'rgba(10, 12, 21, 0.78)',
+              border: '1px solid rgba(0, 255, 136, 0.18)',
+              color: '#8b92a8',
+              fontSize: '11px',
+              lineHeight: 1.45,
+              boxShadow: '0 10px 24px rgba(0,0,0,0.22)',
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '10px',
+                marginBottom: '8px',
+              }}>
+                <span style={{
+                  color: '#00ff88',
+                  fontWeight: 800,
+                  letterSpacing: '0.7px',
+                  textTransform: 'uppercase',
+                }}>
+                  Launch URL Debug
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCopyLaunchUrl}
+                  style={{
+                    padding: '5px 9px',
+                    background: 'rgba(0, 255, 136, 0.1)',
+                    color: '#00ff88',
+                    border: '1px solid rgba(0, 255, 136, 0.3)',
+                    borderRadius: '7px',
+                    cursor: 'pointer',
+                    fontSize: '10px',
+                    fontWeight: 700,
+                  }}
+                >
+                  {launchDebugCopied ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+
+              <div style={{
+                color: launchUrl ? '#fff' : '#ff4444',
+                fontFamily: 'monospace',
+                wordBreak: 'break-all',
+                whiteSpace: 'normal',
+                marginBottom: '8px',
+              }}>
+                {launchUrl || 'empty launch URL'}
+              </div>
+
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '4px 10px',
+                color: '#5a6072',
+                fontFamily: 'monospace',
+              }}>
+                <span>canLaunch: {String(canLaunch)}</span>
+                <span>enabled: {String(launchButtonEnabled)}</span>
+                <span>version: {launchData?.version || 'empty'}</span>
+                <span>hwid: {currentHwid ? 'set' : 'empty'}</span>
+                <span>approved: {String(hasApprovedHwid)}</span>
+                <span>expired: {String(isGroupExpired)}</span>
+              </div>
+            </div>
+            )}
           </div>
 
           <button
@@ -1887,6 +1996,63 @@ const launchButtonEnabled = canLaunch && !launching
     }}
   />
 </div>
+
+                <div style={{
+                  gridColumn: '1 / -1',
+                  padding: '16px',
+                  borderRadius: '12px',
+                  background: 'rgba(10, 12, 21, 0.65)',
+                  border: '1px solid rgba(255, 149, 0, 0.16)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '16px',
+                }}>
+                  <div>
+                    <div style={{
+                      color: '#fff',
+                      fontSize: '14px',
+                      fontWeight: 700,
+                      marginBottom: '4px',
+                    }}>
+                      Launch Button Debug
+                    </div>
+                    <div style={{
+                      color: '#5a6072',
+                      fontSize: '12px',
+                      lineHeight: 1.5,
+                    }}>
+                      Show full launch URL and debug flags under the Launch button for all users.
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowLaunchDebugSetting(prev => !prev)}
+                    aria-pressed={showLaunchDebugSetting}
+                    style={{
+                      width: '58px',
+                      height: '30px',
+                      padding: '3px',
+                      borderRadius: '999px',
+                      border: `1px solid ${showLaunchDebugSetting ? 'rgba(0, 255, 136, 0.45)' : 'rgba(90, 96, 114, 0.35)'}`,
+                      background: showLaunchDebugSetting ? 'rgba(0, 255, 136, 0.18)' : 'rgba(58, 61, 78, 0.5)',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    <span style={{
+                      display: 'block',
+                      width: '22px',
+                      height: '22px',
+                      borderRadius: '50%',
+                      background: showLaunchDebugSetting ? '#00ff88' : '#5a6072',
+                      transform: showLaunchDebugSetting ? 'translateX(26px)' : 'translateX(0)',
+                      transition: 'all 0.2s ease',
+                      boxShadow: showLaunchDebugSetting ? '0 0 10px rgba(0,255,136,0.6)' : 'none',
+                    }} />
+                  </button>
+                </div>
               </div>
 
               <div style={{
