@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { approveUser, rejectUser } from './actions'
 import { uploadFile, listFiles, deleteFile, getSignedDownloadUrl } from './file-actions'
 import { saveUserConfig, getUserConfig } from './config-actions'
-import { saveLaunchSettings } from './settings-actions'
+import { getLaunchSettings, saveLaunchSettings } from './settings-actions'
 import { updateUserGroup, updateUserRole, updateUserHwidApproval, bulkUpdateUserRole, bulkUpdateUserGroup, bulkDeleteUsers, updateGroupExpiration } from './group-actions'
 
 interface User {
@@ -415,30 +415,26 @@ useEffect(() => {
 }, [activeTab]);
 
   async function fetchLaunchData() {
-    const { data, error } = await supabase
-      .from('user_launch_credentials')
-      .select('id, token, version, changelog')
-      .eq('id', LAUNCH_CREDENTIAL_ID)
-      .maybeSingle()
+    const result = await getLaunchSettings()
 
-    if (error) {
-      console.error('Error fetching launch data:', error)
+    if (result.error) {
+      console.error('Error fetching launch data:', result.error)
       setLaunchData(null)
       setSettingsVersion('')
       setChangelogText('')
       return
     }
 
-    if (!data) {
+    if (!result.data) {
       setLaunchData(null)
       setSettingsVersion('')
       setChangelogText('')
       return
     }
 
-    setLaunchData(data)
-    setSettingsVersion(data.version || '')
-    setChangelogText(data.changelog || '')
+    setLaunchData(result.data)
+    setSettingsVersion(result.data.version || '')
+    setChangelogText(result.data.changelog || '')
   }
 
   async function fetchFiles() {
