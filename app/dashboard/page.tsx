@@ -936,7 +936,7 @@ useEffect(() => {
 
   async function handleLaunch() {
     if (!canLaunch) {
-      alert(`Launch blocked!\n\ncanLaunch: ${canLaunch}\nlaunchUrl: ${launchUrl || 'empty'}\nhasApprovedHwid: ${hasApprovedHwid}\nisGroupExpired: ${isGroupExpired}\nuserGroupId: ${userGroupId || 'none'}\nuserGroupExpiration: ${userGroupExpiration ? userGroupExpiration.expiretime : 'none'}`)
+      alert(`Launch blocked!\n\ncanLaunch: ${canLaunch}\nlaunchUrl: ${launchUrl || 'empty'}\nhasApprovedHwid: ${hasApprovedHwid}\nhasAssignedGroup: ${hasAssignedGroup}\nisGroupExpired: ${isGroupExpired}\nuserGroupId: ${userGroupId || 'none'}\nuserGroupExpiration: ${userGroupExpiration ? userGroupExpiration.expiretime : 'none'}`)
       return
     }
 
@@ -999,55 +999,58 @@ useEffect(() => {
   const currentHwid = currentUserRow?.hwid?.trim() || ''
   const hasApprovedHwid = currentUserRow?.role === 'admin' || currentUserRow?.hwid_approved === true
 
-  // Get user's group and check expiration
-  const rawUserGroupId =
-  currentUserRow !== null && currentUserRow !== undefined
-    ? currentUserRow.group_id
-    : user?.group_id
+  // Get user's group and check expiration.
+  // Launch must be blocked when group is not assigned, empty, or "not set".
+  const rawUserGroupId = currentUserRow?.group_id ?? user?.group_id ?? null
+  const normalizedUserGroupId = rawUserGroupId ? String(rawUserGroupId).trim() : ''
+  const userGroupId =
+    normalizedUserGroupId && normalizedUserGroupId.toLowerCase() !== 'not set'
+      ? normalizedUserGroupId
+      : null
 
-const userGroupId =
-  rawUserGroupId && String(rawUserGroupId).trim() !== 'not set'
-    ? String(rawUserGroupId).trim()
+  const hasAssignedGroup = Boolean(userGroupId)
+  const userGroupExpiration = hasAssignedGroup
+    ? groupExpirations.find(ge => ge.group_id === userGroupId)
     : null
-
-const hasAssignedGroup = Boolean(userGroupId)
-
-const userGroupExpiration = hasAssignedGroup
-  ? groupExpirations.find(ge => ge.group_id === userGroupId)
-  : null
-
-const isGroupExpired = userGroupExpiration
-  ? new Date(userGroupExpiration.expiretime).getTime() <= Date.now()
-  : false
+  const isGroupExpired = userGroupExpiration
+    ? new Date(userGroupExpiration.expiretime).getTime() <= Date.now()
+    : false
 
   const launchUrl =
     launchData && currentHwid
       ? `ezcrosshairalpha://launch?token=${encodeURIComponent(launchData.token)}&hw=${encodeURIComponent(currentHwid)}&ver=${encodeURIComponent(launchData.version)}`
       : ''
 
-  // Disable launch if group is expired
+  // Disable launch if user is pending, has no approved HWID, has no assigned group,
+  // has no expiration row for that group, or the assigned group is already expired.
   const isPending = user?.role === 'pending'
-const canLaunch = Boolean(launchUrl) && hasApprovedHwid && hasAssignedGroup && Boolean(userGroupExpiration) && !isGroupExpired && !isPending
+  const canLaunch =
+    Boolean(launchUrl) &&
+    hasApprovedHwid &&
+    hasAssignedGroup &&
+    Boolean(userGroupExpiration) &&
+    !isGroupExpired &&
+    !isPending
 
-if (isPending) {
-  launchLabel = 'Pending approval'
-} else if (!launchUrl) {
-  launchLabel = 'Launch unavailable'
-} else if (!hasAssignedGroup) {
-  launchLabel = 'Launch unavailable'
-} else if (!userGroupExpiration) {
-  launchLabel = 'Launch unavailable'
-} else if (isGroupExpired) {
-  launchLabel = 'Launch unavailable'
-} else if (!hasApprovedHwid) {
-  launchLabel = 'Launch unavailable'
-} else if (launching) {
-  launchLabel = 'Launching...'
-} else {
-  launchLabel = 'Launch'
-}
-
-const launchButtonEnabled = canLaunch && !launching
+  let launchLabel: string
+  if (isPending) {
+    launchLabel = 'Pending approval'
+  } else if (!launchUrl) {
+    launchLabel = 'Launch unavailable'
+  } else if (!hasApprovedHwid) {
+    launchLabel = 'Launch unavailable'
+  } else if (!hasAssignedGroup) {
+    launchLabel = 'No group assigned'
+  } else if (!userGroupExpiration) {
+    launchLabel = 'Group unavailable'
+  } else if (isGroupExpired) {
+    launchLabel = 'Launch unavailable'
+  } else if (launching) {
+    launchLabel = 'Launching...'
+  } else {
+    launchLabel = 'Launch'
+  }
+  const launchButtonEnabled = canLaunch && !launching
   const isUserOnline = (userId: number) => onlineUserIds.includes(userId)
   const sortUsersByRoleAndOnline = (a: User, b: User) => {
     const aIsAdmin = a.role === 'admin'
