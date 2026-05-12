@@ -7,6 +7,7 @@ type LaunchSettings = {
   token: string
   version: string
   changelog: string | null
+  banner_id: number
   created_at?: string | null
   updated_at?: string | null
 }
@@ -28,6 +29,7 @@ function normalizeLaunchSettingsRow(data: unknown): LaunchSettings | null {
     token: String(value.token || ''),
     version: String(value.version || ''),
     changelog: typeof value.changelog === 'string' ? value.changelog : '',
+    banner_id: Number(value.banner_id || 0),
     created_at: typeof value.created_at === 'string' ? value.created_at : null,
     updated_at: typeof value.updated_at === 'string' ? value.updated_at : null,
   }
@@ -69,6 +71,8 @@ export async function saveLaunchSettings(
 
   // Always edit only public.user_launch_credentials row id=1.
   // This RPC does not need to return a row; after saving, we reload id=1.
+  // The SQL migration increments banner_id every successful settings save,
+  // so users will see the latest changelog until they dismiss it.
   const { error } = await supabase.rpc('update_launch_settings', {
     p_version: nextVersion,
     p_changelog: changelog || '',

@@ -20,6 +20,7 @@ interface User {
   group_id?: string | null
   hwid?: string | null
   hwid_approved?: boolean | null
+  dismissed_banner_id?: number | null
 }
 
 interface LaunchCredential {
@@ -27,6 +28,7 @@ interface LaunchCredential {
   token: string
   version: string
   changelog?: string | null
+  banner_id?: number | null
 }
 
 interface GroupExpiration {
@@ -337,6 +339,29 @@ export default function DashboardPage() {
     }
   }, [])
 
+  // Realtime listener for launch settings changes (banner/changelog updates)
+  useEffect(() => {
+    const channel = supabase
+      .channel('launch-settings-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_launch_credentials',
+          filter: `id=eq.${LAUNCH_CREDENTIAL_ID}`
+        },
+        () => {
+          fetchLaunchData()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [])
+
   // Auto-refresh page when current user's role changes
     // Auto-refresh page when current user's role or group_id changes
   useEffect(() => {
@@ -392,7 +417,7 @@ export default function DashboardPage() {
   async function fetchUsers() {
     const { data, error } = await supabase
       .from('users')
-      .select('id, username, role, created_at, last_login_at, last_launch_at, group_id, hwid, hwid_approved')
+      .select('id, username, role, created_at, last_login_at, last_launch_at, group_id, hwid, hwid_approved, dismissed_banner_id')
       .order('created_at', { ascending: false })
 
     setUsers(data || [])
@@ -781,6 +806,36 @@ useEffect(() => {
     }
   }
 
+  async function handleDismissChangelogBanner() {
+    const currentUserId = getUserId(user)
+
+    if (!currentUserId || !launchData?.banner_id) return
+
+    const { error } = await supabase.rpc('dismiss_changelog_banner', {
+      p_user_id: currentUserId,
+      p_banner_id: launchData.banner_id,
+    })
+
+    if (error) {
+      console.error('Error dismissing changelog banner:', error)
+      return
+    }
+
+    setUsers(prev =>
+      prev.map(u =>
+        u.id === currentUserId
+          ? { ...u, dismissed_banner_id: launchData.banner_id }
+          : u
+      )
+    )
+
+    if (user?.id === currentUserId) {
+      const updatedUser = { ...user, dismissed_banner_id: launchData.banner_id }
+      setUser(updatedUser)
+      localStorage.setItem('ezcrosshair_user', JSON.stringify(updatedUser))
+    }
+  }
+
   async function handleLaunch() {
     if (!canLaunch) {
       alert(`Launch blocked!\n\ncanLaunch: ${canLaunch}\nlaunchUrl: ${launchUrl || 'empty'}\nhasApprovedHwid: ${hasApprovedHwid}\nisGroupExpired: ${isGroupExpired}\nuserGroupId: ${userGroupId || 'none'}\nuserGroupExpiration: ${userGroupExpiration ? userGroupExpiration.expiretime : 'none'}`)
@@ -839,6 +894,10 @@ useEffect(() => {
 
     const currentUserId = getUserId(user)
   const currentUserRow = currentUserId ? users.find(u => u.id === currentUserId) : null
+  const showChangelogBanner =
+    Boolean(launchData?.changelog?.trim()) &&
+    Boolean(launchData?.banner_id) &&
+    (currentUserRow?.dismissed_banner_id || 0) < (launchData?.banner_id || 0)
   const currentHwid = currentUserRow?.hwid?.trim() || ''
   const hasApprovedHwid = currentUserRow?.role === 'admin' || currentUserRow?.hwid_approved === true
 
@@ -1098,6 +1157,64 @@ const launchButtonEnabled = canLaunch && !launching
           </button>
         </div>
 
+
+        {showChangelogBanner && (
+          <div style={{
+            marginBottom: '24px',
+            padding: '18px 20px',
+            borderRadius: '14px',
+            background: 'rgba(255, 149, 0, 0.12)',
+            border: '1px solid rgba(255, 149, 0, 0.3)',
+            color: '#fff',
+            boxShadow: '0 12px 30px rgba(0,0,0,0.25)',
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              gap: '16px',
+              alignItems: 'flex-start',
+            }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{
+                  color: '#ff9500',
+                  fontSize: '13px',
+                  fontWeight: 800,
+                  letterSpacing: '0.8px',
+                  textTransform: 'uppercase',
+                  marginBottom: '8px',
+                }}>
+                  New Update Available • Version {launchData?.version}
+                </div>
+
+                <div style={{
+                  color: '#fff',
+                  fontSize: '14px',
+                  lineHeight: 1.6,
+                  whiteSpace: 'pre-wrap',
+                }}>
+                  {launchData?.changelog}
+                </div>
+              </div>
+
+              <button
+                onClick={handleDismissChangelogBanner}
+                style={{
+                  flexShrink: 0,
+                  padding: '8px 12px',
+                  background: 'transparent',
+                  color: '#ff9500',
+                  border: '1px solid rgba(255, 149, 0, 0.4)',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                }}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Admin Tabs */}
         {user.role === 'admin' && (
