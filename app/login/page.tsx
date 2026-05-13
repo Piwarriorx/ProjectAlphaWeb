@@ -213,21 +213,31 @@ export default function LoginPage() {
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'UPDATE',
           schema: 'public',
           table: 'users',
           filter: `id=eq.${pendingUser.id}`,
         },
         (payload) => {
-          if (payload.eventType === 'DELETE') {
-            rejectPendingUser()
-            return
-          }
-
           const changedUser = payload.new as UserRealtimeRow | null
           if (!changedUser) return
 
           approvePendingUser(changedUser)
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'users',
+        },
+        (payload) => {
+          const deletedUserId = Number((payload.old as { id?: number | string } | null)?.id)
+
+          if (deletedUserId === pendingUser.id) {
+            rejectPendingUser()
+          }
         }
       )
       .subscribe()
@@ -237,6 +247,7 @@ export default function LoginPage() {
       supabase.removeChannel(channel)
     }
   }, [pendingUser?.id, pendingUser?.username])
+
 
   async function handleLogin(formData: FormData) {
   setMessage('')

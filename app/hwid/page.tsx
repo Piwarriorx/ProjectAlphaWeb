@@ -125,8 +125,13 @@ export default function HwidPage() {
       setPendingApproval(true)
     }
 
+    const logoutDeletedUser = () => {
+      localStorage.removeItem('ezcrosshair_user')
+      window.location.href = '/login'
+    }
+
     const channel = supabase
-      .channel(`hwid-user-changes-${userId}`)
+      .channel(`hwid-user-guard-${userId}`)
       .on(
         'postgres_changes',
         {
@@ -136,20 +141,51 @@ export default function HwidPage() {
           filter: `id=eq.${userId}`,
         },
         (payload) => {
-          applyUserUpdate(payload.new as {
+          console.log('HWID UPDATE payload:', payload)
+
+          const changedUser = payload.new as {
             hwid?: string | null
             hwid_approved?: boolean | null
             role?: string | null
             group_id?: string | null
-          })
+          } | null
+
+          if (!changedUser) return
+
+          if (changedUser.role === 'pending') {
+            logoutDeletedUser()
+            return
+          }
+
+          applyUserUpdate(changedUser)
         }
       )
-      .subscribe()
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'users',
+        },
+        (payload) => {
+          console.log('HWID DELETE payload:', payload)
+
+          const deletedUserId = Number((payload.old as { id?: number | string } | null)?.id)
+
+          if (deletedUserId === userId) {
+            logoutDeletedUser()
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('HWID user guard realtime status:', status)
+      })
 
     return () => {
       supabase.removeChannel(channel)
     }
   }, [userId])
+
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()

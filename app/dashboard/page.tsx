@@ -209,7 +209,8 @@ export default function DashboardPage() {
     }
 
     if (payload.eventType === 'DELETE' && oldUser?.id) {
-      setUsers(prev => prev.filter(u => u.id !== oldUser.id))
+      const deletedUserId = Number(oldUser.id)
+      setUsers(prev => prev.filter(u => u.id !== deletedUserId))
     }
   }
 
@@ -353,10 +354,28 @@ export default function DashboardPage() {
     if (!user || loading) return
 
     const currentUserId = getUserId(user)
-    if (!currentUserId) return
+    if (!currentUserId) {
+      localStorage.removeItem('ezcrosshair_user')
+      window.location.href = '/login'
+      return
+    }
 
     const currentUserRow = users.find(u => u.id === currentUserId)
-    if (currentUserRow === undefined) return
+
+    // Safety fallback: if the current user's row no longer exists, log out.
+    // This covers missed realtime DELETE events or reconnect gaps.
+    if (!currentUserRow) {
+      localStorage.removeItem('ezcrosshair_user')
+      window.location.href = '/login'
+      return
+    }
+
+    // If an admin moves this account back to pending/rejected, invalidate the local session.
+    if (currentUserRow.role === 'pending') {
+      localStorage.removeItem('ezcrosshair_user')
+      window.location.href = '/login'
+      return
+    }
 
     if (currentUserRow.role !== 'admin' && currentUserRow.hwid_approved !== true && window.location.pathname !== '/hwid') {
       window.location.href = '/hwid'
@@ -473,16 +492,22 @@ export default function DashboardPage() {
   // Launch settings are updated by Supabase Realtime above.
   // Do not poll getLaunchSettings() here; that Server Action runs on Vercel.
 
-  // Realtime update for the currently logged-in user.
-  // Role, group, HWID approval, and banner dismiss state update without page reload.
+  // Realtime guard for the currently logged-in user.
+  // UPDATE is filtered to this user; DELETE is intentionally unfiltered and then
+  // compared by payload.old.id because filtered DELETE events can be missed in some setups.
   useEffect(() => {
     if (!user) return
 
     const currentUserId = getUserId(user)
     if (!currentUserId) return
 
+    const logoutCurrentSession = () => {
+      localStorage.removeItem('ezcrosshair_user')
+      window.location.href = '/login'
+    }
+
     const channel = supabase
-      .channel(`current-user-changes-${currentUserId}`)
+      .channel(`current-user-guard-${currentUserId}`)
       .on(
         'postgres_changes',
         {
@@ -492,16 +517,51 @@ export default function DashboardPage() {
           filter: `id=eq.${currentUserId}`
         },
         (payload) => {
+          console.log('Current user UPDATE payload:', payload)
+
           const changedUser = payload.new as Partial<User> | null
+
+          // If an admin moves this account back to pending/rejected, force logout.
+          if (changedUser?.role === 'pending') {
+            logoutCurrentSession()
+            return
+          }
+
           applyCurrentUserRealtimeUpdate(changedUser)
         }
       )
-      .subscribe()
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'users'
+        },
+        (payload) => {
+          console.log('Current user DELETE payload:', payload)
+
+          const deletedUserId = Number((payload.old as Partial<User> | null)?.id)
+
+          // Keep admin/user lists in sync too.
+          if (deletedUserId) {
+            setUsers(prev => prev.filter(u => u.id !== deletedUserId))
+          }
+
+          // If the deleted row is this browser's logged-in account, clear the stale session.
+          if (deletedUserId === currentUserId) {
+            logoutCurrentSession()
+          }
+        }
+      )
+      .subscribe((status) => {
+        console.log('Current user guard realtime status:', status)
+      })
 
     return () => {
       supabase.removeChannel(channel)
     }
   }, [user?.id, user?.user_id, user?.userId])
+
 
   async function fetchUsers() {
     const { data, error } = await supabase
