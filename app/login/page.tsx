@@ -74,19 +74,38 @@ export default function LoginPage() {
 
       if (!parsedId || Number.isNaN(parsedId)) {
         localStorage.removeItem('ezcrosshair_user')
-      } else if (userData?.role === 'admin') {
-        window.location.href = '/dashboard'
-        return
       } else {
         ;(async () => {
           const supabase = createClient()
-          const { data } = await supabase
+          const { data, error } = await supabase
             .from('users')
-            .select('hwid_approved')
+            .select('id, username, role, group_id, hwid, hwid_approved, dismissed_banner_id, last_login_at, last_launch_at')
             .eq('id', parsedId)
             .single()
 
-          window.location.href = data?.hwid_approved === true ? '/dashboard' : '/hwid'
+          // If the admin deleted/rejected this user while the browser still had
+          // localStorage, clear the stale local session and stay on /login.
+          if (error || !data || data.role === 'pending') {
+            localStorage.removeItem('ezcrosshair_user')
+            return
+          }
+
+          const dbUser = data as UserRealtimeRow
+          const sessionUser = {
+            id: Number(dbUser.id),
+            userId: Number(dbUser.id),
+            username: dbUser.username || userData?.username || '',
+            role: dbUser.role || userData?.role || 'user',
+            group_id: dbUser.group_id ?? null,
+            hwid: dbUser.hwid ?? null,
+            hwid_approved: dbUser.hwid_approved ?? false,
+            dismissed_banner_id: dbUser.dismissed_banner_id ?? null,
+            last_login_at: dbUser.last_login_at ?? null,
+            last_launch_at: dbUser.last_launch_at ?? null,
+          }
+
+          localStorage.setItem('ezcrosshair_user', JSON.stringify(sessionUser))
+          window.location.href = getRedirectForApprovedUser(dbUser)
         })()
         return
       }
@@ -147,6 +166,47 @@ export default function LoginPage() {
     if (!pendingUser?.id) return
 
     const supabase = createClient()
+    let cancelled = false
+
+    const rejectPendingUser = () => {
+      localStorage.removeItem('ezcrosshair_pending_user')
+      setPendingUser(null)
+      setMessage('Your registration was rejected. Please contact an admin or register again.')
+    }
+
+    const approvePendingUser = (row: UserRealtimeRow) => {
+      if (!row.role || row.role === 'pending') {
+        setMessage('Account created! Waiting for admin approval.')
+        return
+      }
+
+      const sessionUser = buildSessionUser(row, pendingUser)
+      localStorage.setItem('ezcrosshair_user', JSON.stringify(sessionUser))
+      localStorage.removeItem('ezcrosshair_pending_user')
+      setPendingUser(null)
+      setMessage('Account approved! Redirecting...')
+
+      window.location.href = getRedirectForApprovedUser(row)
+    }
+
+    // Initial check catches cases where the admin approved/deleted the row
+    // while this tab was offline or before the realtime subscription connected.
+    ;(async () => {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, username, role, group_id, hwid, hwid_approved, dismissed_banner_id, last_login_at, last_launch_at')
+        .eq('id', pendingUser.id)
+        .single()
+
+      if (cancelled) return
+
+      if (error || !data) {
+        rejectPendingUser()
+        return
+      }
+
+      approvePendingUser(data as UserRealtimeRow)
+    })()
 
     const channel = supabase
       .channel(`pending-user-approval-${pendingUser.id}`)
@@ -160,34 +220,20 @@ export default function LoginPage() {
         },
         (payload) => {
           if (payload.eventType === 'DELETE') {
-            localStorage.removeItem('ezcrosshair_pending_user')
-            setPendingUser(null)
-            setMessage('Your registration was rejected. Please contact an admin or register again.')
+            rejectPendingUser()
             return
           }
 
           const changedUser = payload.new as UserRealtimeRow | null
           if (!changedUser) return
 
-          if (changedUser.role === 'pending') {
-            setMessage('Account created! Waiting for admin approval.')
-            return
-          }
-
-          if (!changedUser.role) return
-
-          const sessionUser = buildSessionUser(changedUser, pendingUser)
-          localStorage.setItem('ezcrosshair_user', JSON.stringify(sessionUser))
-          localStorage.removeItem('ezcrosshair_pending_user')
-          setPendingUser(null)
-          setMessage('Account approved! Redirecting...')
-
-          window.location.href = getRedirectForApprovedUser(changedUser)
+          approvePendingUser(changedUser)
         }
       )
       .subscribe()
 
     return () => {
+      cancelled = true
       supabase.removeChannel(channel)
     }
   }, [pendingUser?.id, pendingUser?.username])
