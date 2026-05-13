@@ -156,6 +156,63 @@ export default function DashboardPage() {
   const predefinedGroups = ['not set', '1', '2', '3', '4', '5']
   const supabase = createClient()
 
+  function applyCurrentUserRealtimeUpdate(changedUser: Partial<User> | null) {
+    if (!changedUser?.id) return
+
+    const changedUserId = Number(changedUser.id)
+    const currentUserId = getUserId(user)
+
+    if (!currentUserId || changedUserId !== currentUserId) return
+
+    setUser(prev => {
+      if (!prev) return prev
+
+      const updatedUser = {
+        ...prev,
+        ...changedUser,
+      } as User
+
+      localStorage.setItem('ezcrosshair_user', JSON.stringify(updatedUser))
+      return updatedUser
+    })
+
+    setUsers(prev =>
+      prev.some(u => u.id === changedUserId)
+        ? prev.map(u =>
+            u.id === changedUserId
+              ? { ...u, ...changedUser } as User
+              : u
+          )
+        : [changedUser as User, ...prev]
+    )
+  }
+
+  function applyUsersRealtimePayload(payload: { eventType: string; new: unknown; old: unknown }) {
+    const changedUser = payload.new as Partial<User> | null
+    const oldUser = payload.old as Partial<User> | null
+
+    if (payload.eventType === 'INSERT' && changedUser?.id) {
+      setUsers(prev => {
+        const exists = prev.some(u => u.id === changedUser.id)
+        return exists ? prev : [changedUser as User, ...prev]
+      })
+      return
+    }
+
+    if (payload.eventType === 'UPDATE' && changedUser?.id) {
+      setUsers(prev =>
+        prev.some(u => u.id === changedUser.id)
+          ? prev.map(u => u.id === changedUser.id ? { ...u, ...changedUser } as User : u)
+          : [changedUser as User, ...prev]
+      )
+      return
+    }
+
+    if (payload.eventType === 'DELETE' && oldUser?.id) {
+      setUsers(prev => prev.filter(u => u.id !== oldUser.id))
+    }
+  }
+
   useEffect(() => {
   let intervalId: ReturnType<typeof setInterval> | null = null
   let cancelled = false
@@ -317,43 +374,9 @@ export default function DashboardPage() {
         { event: '*', schema: 'public', table: 'users' },
         (payload) => {
           const changedUser = payload.new as Partial<User> | null
-          const oldUser = payload.old as Partial<User> | null
 
-          fetchUsers()
-
-          // Auto-refresh kapag nagbago ang role ng current user
-          if (
-            payload.eventType === 'UPDATE' &&
-            changedUser?.role !== oldUser?.role
-          ) {
-            const currentUserId = getUserId(user)
-            if (currentUserId && changedUser?.id === currentUserId) {
-              const session = localStorage.getItem('ezcrosshair_user')
-              if (session) {
-                const userData = JSON.parse(session)
-                userData.role = changedUser.role
-                localStorage.setItem('ezcrosshair_user', JSON.stringify(userData))
-              }
-              window.location.reload()
-            }
-          }
-
-          // Auto-refresh kapag nagbago ang group_id ng current user
-          if (
-            payload.eventType === 'UPDATE' &&
-            changedUser?.group_id !== oldUser?.group_id
-          ) {
-            const currentUserId = getUserId(user)
-            if (currentUserId && changedUser?.id === currentUserId) {
-              const session = localStorage.getItem('ezcrosshair_user')
-              if (session) {
-                const userData = JSON.parse(session)
-                userData.group_id = changedUser.group_id
-                localStorage.setItem('ezcrosshair_user', JSON.stringify(userData))
-              }
-              window.location.reload()
-            }
-          }
+          applyUsersRealtimePayload(payload)
+          applyCurrentUserRealtimeUpdate(changedUser)
 
           if (
             payload.eventType === 'UPDATE' &&
@@ -423,20 +446,19 @@ export default function DashboardPage() {
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'UPDATE',
           schema: 'public',
           table: 'user_launch_credentials',
           filter: `id=eq.${LAUNCH_CREDENTIAL_ID}`,
         },
-        async (payload) => {
+        (payload) => {
           console.log('Launch settings realtime payload:', payload)
 
           const applied = applyLaunchSettings(payload.new as Partial<LaunchCredential> | null)
 
-          // Fallback reload ensures RPC/server data is used even if payload is incomplete.
-          if (!applied) {
-            await fetchLaunchData()
-          }
+          // If the realtime payload is incomplete, keep the current launch data instead
+          // of polling a Vercel Server Action. A manual refresh will still reload it.
+          if (!applied) return
         }
       )
       .subscribe((status) => {
@@ -448,20 +470,11 @@ export default function DashboardPage() {
     }
   }, [user?.role, activeTab])
 
-  // Safety fallback: if Supabase Realtime misses an event, users still get the
-  // newest banner/changelog without manually refreshing the page.
-  useEffect(() => {
-    if (user?.role === 'admin' && activeTab === 'settings') return
+  // Launch settings are updated by Supabase Realtime above.
+  // Do not poll getLaunchSettings() here; that Server Action runs on Vercel.
 
-    const interval = setInterval(() => {
-      fetchLaunchData()
-    }, 3000)
-
-    return () => clearInterval(interval)
-  }, [user?.role, activeTab])
-
-  // Auto-refresh page when current user's role changes
-    // Auto-refresh page when current user's role or group_id changes
+  // Realtime update for the currently logged-in user.
+  // Role, group, HWID approval, and banner dismiss state update without page reload.
   useEffect(() => {
     if (!user) return
 
@@ -469,7 +482,7 @@ export default function DashboardPage() {
     if (!currentUserId) return
 
     const channel = supabase
-      .channel('user-role-changes')
+      .channel(`current-user-changes-${currentUserId}`)
       .on(
         'postgres_changes',
         {
@@ -479,30 +492,8 @@ export default function DashboardPage() {
           filter: `id=eq.${currentUserId}`
         },
         (payload) => {
-          const changedUser = payload.new as Partial<User>
-          const oldUser = payload.old as Partial<User>
-
-          // Auto-refresh kapag nagbago ang role
-          if (changedUser.role !== oldUser.role) {
-            const session = localStorage.getItem('ezcrosshair_user')
-            if (session) {
-              const userData = JSON.parse(session)
-              userData.role = changedUser.role
-              localStorage.setItem('ezcrosshair_user', JSON.stringify(userData))
-            }
-            window.location.reload()
-          }
-
-          // Auto-refresh kapag nagbago ang group_id
-          if (changedUser.group_id !== oldUser.group_id) {
-            const session = localStorage.getItem('ezcrosshair_user')
-            if (session) {
-              const userData = JSON.parse(session)
-              userData.group_id = changedUser.group_id
-              localStorage.setItem('ezcrosshair_user', JSON.stringify(userData))
-            }
-            window.location.reload()
-          }
+          const changedUser = payload.new as Partial<User> | null
+          applyCurrentUserRealtimeUpdate(changedUser)
         }
       )
       .subscribe()
@@ -510,7 +501,7 @@ export default function DashboardPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user])
+  }, [user?.id, user?.user_id, user?.userId])
 
   async function fetchUsers() {
     const { data, error } = await supabase
@@ -526,16 +517,8 @@ export default function DashboardPage() {
     setSelectedUserIds(prev => prev.filter(id => users.some(user => user.id === id)))
   }, [users])
 
-  // Auto-refresh Group Expirations every 1 second
-useEffect(() => {
-  if (activeTab !== 'group') return;
-
-  const interval = setInterval(() => {
-    fetchGroupExpirations(); // fetch latest data from Supabase
-  }, 1000); // every 1 second
-
-  return () => clearInterval(interval); // cleanup on unmount or tab change
-}, [activeTab]);
+  // Group expiration rows are updated by Supabase Realtime above.
+  // The remaining-time display uses Date.now(), so no database polling is needed.
 
   async function fetchLaunchData() {
     const result = await getLaunchSettings()
