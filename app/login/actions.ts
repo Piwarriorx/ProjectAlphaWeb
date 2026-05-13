@@ -26,18 +26,27 @@ export async function register(formData: FormData) {
 
   if (hashError || !hashData) return { error: 'Failed to hash password' }
 
-  // New users start as 'pending' - needs admin approval
-  const { error: insertError } = await supabase
+  // New users start as 'pending' - needs admin approval.
+  // Return the inserted row id so the login page can subscribe to this
+  // exact user row and auto-continue when an admin approves the account.
+  const { data: insertedUser, error: insertError } = await supabase
     .from('users')
-    .insert({ 
-      username, 
+    .insert({
+      username,
       password_hash: hashData,
-      role: 'pending'  // <-- Default role is pending
+      role: 'pending',
     })
+    .select('id, username, role')
+    .single()
 
   if (insertError) return { error: insertError.message }
 
-  return { success: 'Account created! Waiting for admin approval.' }
+  return {
+    success: 'Account created! Waiting for admin approval.',
+    pendingUserId: insertedUser?.id,
+    username: insertedUser?.username || username,
+    role: insertedUser?.role || 'pending',
+  }
 }
 
 export async function login(formData: FormData) {

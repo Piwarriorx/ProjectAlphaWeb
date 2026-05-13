@@ -4,14 +4,63 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { login, register } from './actions'
 
+type StoredUser = {
+  id?: number | string
+  userId?: number | string
+  user_id?: number | string
+  username?: string
+  role?: string
+}
+
+type PendingUser = {
+  id: number
+  username: string
+}
+
+type UserRealtimeRow = {
+  id?: number
+  username?: string | null
+  role?: string | null
+  group_id?: string | null
+  hwid?: string | null
+  hwid_approved?: boolean | null
+  dismissed_banner_id?: number | null
+  last_login_at?: string | null
+  last_launch_at?: string | null
+}
+
+function buildSessionUser(row: UserRealtimeRow, fallback: PendingUser) {
+  const id = Number(row.id || fallback.id)
+  const username = String(row.username || fallback.username || '')
+  const role = String(row.role || 'user')
+
+  return {
+    id,
+    userId: id,
+    username,
+    role,
+    group_id: row.group_id ?? null,
+    hwid: row.hwid ?? null,
+    hwid_approved: row.hwid_approved ?? false,
+    dismissed_banner_id: row.dismissed_banner_id ?? null,
+    last_login_at: row.last_login_at ?? null,
+    last_launch_at: row.last_launch_at ?? null,
+  }
+}
+
+function getRedirectForApprovedUser(row: UserRealtimeRow) {
+  return row.role === 'admin' || row.hwid_approved === true ? '/dashboard' : '/hwid'
+}
+
 export default function LoginPage() {
   const [message, setMessage] = useState('')
   const [isRegister, setIsRegister] = useState(false)
+  const [pendingUser, setPendingUser] = useState<PendingUser | null>(null)
 
   useEffect(() => {
     const session = localStorage.getItem('ezcrosshair_user')
     if (session) {
-      let userData: { id?: number | string; userId?: number | string; user_id?: number | string; role?: string } | null = null
+      let userData: StoredUser | null = null
 
       try {
         userData = JSON.parse(session)
@@ -40,6 +89,26 @@ export default function LoginPage() {
           window.location.href = data?.hwid_approved === true ? '/dashboard' : '/hwid'
         })()
         return
+      }
+    }
+
+    const pendingSession = localStorage.getItem('ezcrosshair_pending_user')
+    if (pendingSession) {
+      try {
+        const parsedPending = JSON.parse(pendingSession) as Partial<PendingUser>
+        const pendingId = Number(parsedPending.id)
+
+        if (pendingId && !Number.isNaN(pendingId)) {
+          setPendingUser({
+            id: pendingId,
+            username: String(parsedPending.username || ''),
+          })
+          setMessage('Account created! Waiting for admin approval.')
+        } else {
+          localStorage.removeItem('ezcrosshair_pending_user')
+        }
+      } catch {
+        localStorage.removeItem('ezcrosshair_pending_user')
       }
     }
 
@@ -74,6 +143,55 @@ export default function LoginPage() {
     })
   }, [])
 
+  useEffect(() => {
+    if (!pendingUser?.id) return
+
+    const supabase = createClient()
+
+    const channel = supabase
+      .channel(`pending-user-approval-${pendingUser.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'users',
+          filter: `id=eq.${pendingUser.id}`,
+        },
+        (payload) => {
+          if (payload.eventType === 'DELETE') {
+            localStorage.removeItem('ezcrosshair_pending_user')
+            setPendingUser(null)
+            setMessage('Your registration was rejected. Please contact an admin or register again.')
+            return
+          }
+
+          const changedUser = payload.new as UserRealtimeRow | null
+          if (!changedUser) return
+
+          if (changedUser.role === 'pending') {
+            setMessage('Account created! Waiting for admin approval.')
+            return
+          }
+
+          if (!changedUser.role) return
+
+          const sessionUser = buildSessionUser(changedUser, pendingUser)
+          localStorage.setItem('ezcrosshair_user', JSON.stringify(sessionUser))
+          localStorage.removeItem('ezcrosshair_pending_user')
+          setPendingUser(null)
+          setMessage('Account approved! Redirecting...')
+
+          window.location.href = getRedirectForApprovedUser(changedUser)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [pendingUser?.id, pendingUser?.username])
+
   async function handleLogin(formData: FormData) {
   setMessage('')
   const result = await login(formData)
@@ -98,8 +216,27 @@ export default function LoginPage() {
   async function handleRegister(formData: FormData) {
     setMessage('')
     const result = await register(formData)
-    if (result?.error) setMessage(result.error)
-    if (result?.success) setMessage(result.success)
+
+    if (result && 'error' in result && result.error) {
+      setMessage(result.error)
+      return
+    }
+
+    if (result && 'success' in result && result.success) {
+      setMessage(result.success)
+
+      const pendingUserId = 'pendingUserId' in result ? Number(result.pendingUserId) : null
+      if (pendingUserId && !Number.isNaN(pendingUserId)) {
+        const nextPendingUser = {
+          id: pendingUserId,
+          username: 'username' in result ? String(result.username || '') : '',
+        }
+
+        setPendingUser(nextPendingUser)
+        localStorage.setItem('ezcrosshair_pending_user', JSON.stringify(nextPendingUser))
+        setIsRegister(false)
+      }
+    }
   }
 
   return (
@@ -295,6 +432,26 @@ export default function LoginPage() {
                 {message}
             </div>
             )}
+
+          {pendingUser && (
+            <div style={{
+              background: 'rgba(255, 149, 0, 0.08)',
+              border: '1px solid rgba(255, 149, 0, 0.3)',
+              color: 'var(--accent-primary)',
+              padding: '14px 16px',
+              borderRadius: '10px',
+              marginBottom: '24px',
+              fontSize: '13px',
+              lineHeight: 1.6,
+              position: 'relative',
+              zIndex: 1,
+              textAlign: 'left',
+            }}>
+              <strong>Waiting for admin approval</strong>
+              <br />
+              Keep this page open. Once your account is approved, it will continue automatically.
+            </div>
+          )}
 
           {/* LOGIN FORM */}
           {!isRegister ? (
