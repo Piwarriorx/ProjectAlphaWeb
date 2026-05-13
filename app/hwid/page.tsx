@@ -78,31 +78,42 @@ export default function HwidPage() {
   }, [])
 
   useEffect(() => {
-    if (!userId || !pendingApproval) return
+    if (!userId) return
 
     const supabase = createClient()
-    let cancelled = false
 
-    const checkApproval = async () => {
-      const { data, error } = await supabase
-        .from('users')
-        .select('hwid, hwid_approved')
-        .eq('id', userId)
-        .single()
+    const applyUserUpdate = (row: {
+      hwid?: string | null
+      hwid_approved?: boolean | null
+      role?: string | null
+      group_id?: string | null
+    }) => {
+      const storedHwid = row.hwid?.trim() || ''
 
-      if (cancelled) return
+      if (row.hwid_approved === true) {
+        const session = localStorage.getItem('ezcrosshair_user')
+        if (session) {
+          try {
+            const sessionUser = JSON.parse(session)
+            localStorage.setItem(
+              'ezcrosshair_user',
+              JSON.stringify({
+                ...sessionUser,
+                hwid: storedHwid || sessionUser.hwid,
+                hwid_approved: true,
+                role: row.role ?? sessionUser.role,
+                group_id: row.group_id ?? sessionUser.group_id,
+              })
+            )
+          } catch {
+            localStorage.removeItem('ezcrosshair_user')
+          }
+        }
 
-      if (error || !data) {
-        window.location.href = '/login'
-        return
-      }
-
-      if (data.hwid_approved === true) {
         window.location.href = '/dashboard'
         return
       }
 
-      const storedHwid = data.hwid?.trim() || ''
       if (!storedHwid) {
         setPendingApproval(false)
         setHwid('')
@@ -111,18 +122,34 @@ export default function HwidPage() {
       }
 
       setHwid(storedHwid)
+      setPendingApproval(true)
     }
 
-    void checkApproval()
-    const intervalId = window.setInterval(() => {
-      void checkApproval()
-    }, 5000)
+    const channel = supabase
+      .channel(`hwid-user-changes-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'users',
+          filter: `id=eq.${userId}`,
+        },
+        (payload) => {
+          applyUserUpdate(payload.new as {
+            hwid?: string | null
+            hwid_approved?: boolean | null
+            role?: string | null
+            group_id?: string | null
+          })
+        }
+      )
+      .subscribe()
 
     return () => {
-      cancelled = true
-      window.clearInterval(intervalId)
+      supabase.removeChannel(channel)
     }
-  }, [userId, pendingApproval])
+  }, [userId])
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
