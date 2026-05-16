@@ -2,6 +2,12 @@
 
 import { createServerSupabase } from '@/lib/supabase/server'
 
+function debugLog(...args: unknown[]) {
+  if (process.env.NODE_ENV === 'development') {
+    console.log(...args)
+  }
+}
+
 export async function saveUserConfig(userId: number, configText: string) {
   try {
     // Validate inputs
@@ -17,10 +23,10 @@ export async function saveUserConfig(userId: number, configText: string) {
 
     const supabase = await createServerSupabase()
 
-    console.log('Attempting to save config for user:', userId)
-    console.log('Config text length:', configText.length)
+    debugLog('Attempting to save config for user:', userId)
+    debugLog('Config text length:', configText.length)
 
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('user_config')
       .upsert({
         user_id: userId,
@@ -29,7 +35,6 @@ export async function saveUserConfig(userId: number, configText: string) {
       }, {
         onConflict: 'user_id'
       })
-      .select()
 
     if (error) {
       console.error('Supabase upsert error:', error)
@@ -42,7 +47,7 @@ export async function saveUserConfig(userId: number, configText: string) {
       return { error: `Database error: ${error.message}` }
     }
 
-    console.log('Config saved successfully')
+    debugLog('Config saved successfully')
     return { success: true }
   } catch (err) {
     console.error('Unexpected error in saveUserConfig:', err)
@@ -60,7 +65,7 @@ export async function getUserConfig(userId: number) {
 
     const supabase = await createServerSupabase()
 
-    console.log('Attempting to get config for user:', userId)
+    debugLog('Attempting to get config for user:', userId)
 
     // Use direct table access instead of RPC
     const { data, error } = await supabase
@@ -75,7 +80,7 @@ export async function getUserConfig(userId: number) {
     }
 
     const configText = data?.config_text || ''
-    console.log('Config retrieved successfully, length:', configText.length)
+    debugLog('Config retrieved successfully, length:', configText.length)
     return { configText, error: null }
   } catch (err) {
     console.error('Unexpected error in getUserConfig:', err)

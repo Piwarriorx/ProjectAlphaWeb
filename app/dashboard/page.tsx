@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { approveUser, rejectUser } from './actions'
 import { uploadFile, listFiles, deleteFile, getSignedDownloadUrl } from './file-actions'
@@ -134,13 +134,18 @@ const PASTEBIN_DEFAULT_ON_TEXT = PASTEBIN_DEFAULT_OFF_TEXT
   .replace(/panic = off/g, 'panic = on')
   .replace(/jumpscare = off/g, 'jumpscare = on')
 
+function debugLog(...args: unknown[]) {
+  if (process.env.NODE_ENV === 'development') {
+    console.log(...args)
+  }
+}
+
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null)
   const [users, setUsers] = useState<User[]>([])
   const [files, setFiles] = useState<FileRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [time, setTime] = useState('')
-  const [serverTimeOffsetMs, setServerTimeOffsetMs] = useState(0)
   const [activeTab, setActiveTab] = useState<'users' | 'files' | 'config' | 'pastebin' | 'settings' | 'management' | 'group'>('files')
   const [launchData, setLaunchData] = useState<LaunchCredential | null>(null)
   const [launching, setLaunching] = useState(false)
@@ -181,8 +186,11 @@ export default function DashboardPage() {
   
   // Predefined groups
   const predefinedGroups = ['not set', '1', '2', '3', '4', '5']
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
   const forceLogoutChannelRef = useRef<any>(null)
+  const filesLoadedRef = useRef(false)
+  const configLoadedRef = useRef(false)
+  const pastebinSettingsLoadedRef = useRef(false)
 
   function applyCurrentUserRealtimeUpdate(changedUser: Partial<User> | null) {
     if (!changedUser?.id) return
@@ -277,8 +285,6 @@ export default function DashboardPage() {
     }
 
     const offsetMs = new Date(serverTimeValue).getTime() - Date.now()
-    setServerTimeOffsetMs(offsetMs)
-
     const updateServerClock = () => {
       setTime(formatTimeOnly(new Date(Date.now() + offsetMs)))
     }
@@ -293,7 +299,7 @@ export default function DashboardPage() {
     cancelled = true
     if (intervalId) clearInterval(intervalId)
   }
-}, [])
+}, [supabase])
 
   useEffect(() => {
     if (!user) return
@@ -332,7 +338,7 @@ export default function DashboardPage() {
       channel.untrack()
       supabase.removeChannel(channel)
     }
-  }, [user])
+  }, [user?.id, user?.user_id, user?.userId, user?.username, user?.role, supabase])
 
   useEffect(() => {
     const session = localStorage.getItem('ezcrosshair_user')
@@ -342,43 +348,17 @@ export default function DashboardPage() {
     }
 
     const userData = JSON.parse(session)
-    console.log('User data from localStorage:', userData)
-    console.log('User ID type:', typeof userData?.id)
-    console.log('User ID value:', userData?.id)
+    debugLog('User data from localStorage:', userData)
     
     setUser(userData)
+    setActiveTab('files')
 
-    // Set default tab based on user role
-    if (userData.role === 'user') {
-      setActiveTab('files')
-    } else if (userData.role === 'admin') {
-      setActiveTab('files')
-    }
-
+    // Keep startup small while preserving the default Files tab behavior.
+    // Config and Pastebin settings are loaded lazily by the active-tab effect below.
     fetchUsers()
     fetchFiles()
     fetchGroupExpirations()
-    
-    // Try different possible ID field names like in handleSaveConfig
-    let userId = userData.id || userData.user_id || userData.userId
-    console.log('Extracted userId in useEffect:', userId, 'Type:', typeof userId)
-    
-    // Convert to number if it's a string
-    if (typeof userId === 'string') {
-      userId = parseInt(userId, 10)
-    }
-    
-    if (userId && !isNaN(userId) && userId !== 0) {
-      console.log('Calling fetchUserConfig with userId:', userId)
-      fetchUserConfig(userId)
-    } else {
-      console.error('User data or ID is missing/invalid:', userData, 'Extracted ID:', userId)
-    }
-
     fetchLaunchData()
-    if (userData.role === 'admin') {
-      fetchPastebinSettings()
-    }
   }, [])
 
   useEffect(() => {
@@ -443,7 +423,7 @@ export default function DashboardPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user])
+  }, [user?.role, user?.id, user?.user_id, user?.userId, supabase])
 
     // Realtime listener for group_expirations changes (for all users)
   useEffect(() => {
@@ -453,8 +433,25 @@ export default function DashboardPage() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'group_expirations' },
         (payload) => {
-          console.log('Group expiration changed:', payload)
-          fetchGroupExpirations()
+          debugLog('Group expiration changed:', payload)
+
+          const nextRow = payload.new as GroupExpiration | null
+          const oldRow = payload.old as Partial<GroupExpiration> | null
+
+          setGroupExpirations(prev => {
+            if ((payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') && nextRow?.id) {
+              const exists = prev.some(row => row.id === nextRow.id)
+              return exists
+                ? prev.map(row => row.id === nextRow.id ? nextRow : row)
+                : [...prev, nextRow]
+            }
+
+            if (payload.eventType === 'DELETE' && oldRow?.id) {
+              return prev.filter(row => row.id !== oldRow.id)
+            }
+
+            return prev
+          })
         }
       )
       .subscribe()
@@ -462,7 +459,7 @@ export default function DashboardPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [])
+  }, [supabase])
 
   // Realtime listener for launch settings changes (banner/changelog updates)
   // This updates the visible banner text immediately when Settings is saved.
@@ -503,7 +500,7 @@ export default function DashboardPage() {
           filter: `id=eq.${LAUNCH_CREDENTIAL_ID}`,
         },
         (payload) => {
-          console.log('Launch settings realtime payload:', payload)
+          debugLog('Launch settings realtime payload:', payload)
 
           const applied = applyLaunchSettings(payload.new as Partial<LaunchCredential> | null)
 
@@ -513,13 +510,13 @@ export default function DashboardPage() {
         }
       )
       .subscribe((status) => {
-        console.log('Launch settings realtime status:', status)
+        debugLog('Launch settings realtime status:', status)
       })
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user?.role, activeTab])
+  }, [user?.role, activeTab, supabase])
 
   // Launch settings are updated by Supabase Realtime above.
   // Do not poll getLaunchSettings() here; that Server Action runs on Vercel.
@@ -549,7 +546,7 @@ export default function DashboardPage() {
           filter: `id=eq.${currentUserId}`
         },
         (payload) => {
-          console.log('Current user UPDATE payload:', payload)
+          debugLog('Current user UPDATE payload:', payload)
 
           const changedUser = payload.new as Partial<User> | null
 
@@ -570,7 +567,7 @@ export default function DashboardPage() {
           table: 'users'
         },
         (payload) => {
-          console.log('Current user DELETE payload:', payload)
+          debugLog('Current user DELETE payload:', payload)
 
           const deletedUserId = Number((payload.old as Partial<User> | null)?.id)
 
@@ -586,13 +583,13 @@ export default function DashboardPage() {
         }
       )
       .subscribe((status) => {
-        console.log('Current user guard realtime status:', status)
+        debugLog('Current user guard realtime status:', status)
       })
 
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user?.id, user?.user_id, user?.userId])
+  }, [user?.id, user?.user_id, user?.userId, supabase])
 
 
   // Realtime broadcast channel for admin-triggered client logout.
@@ -627,7 +624,7 @@ export default function DashboardPage() {
       setForceLogoutReady(false)
       supabase.removeChannel(channel)
     }
-  }, [user?.id, user?.user_id, user?.userId, user?.role])
+  }, [user?.id, user?.user_id, user?.userId, user?.role, supabase])
 
 
   async function fetchUsers() {
@@ -643,6 +640,20 @@ export default function DashboardPage() {
   useEffect(() => {
     setSelectedUserIds(prev => prev.filter(id => users.some(user => user.id === id)))
   }, [users])
+
+  useEffect(() => {
+    if (!user || loading) return
+
+    const currentUserId = getUserId(user)
+
+    if (activeTab === 'config' && currentUserId && !configLoadedRef.current) {
+      fetchUserConfig(currentUserId)
+    }
+
+    if (activeTab === 'pastebin' && user.role === 'admin' && !pastebinSettingsLoadedRef.current) {
+      fetchPastebinSettings()
+    }
+  }, [user, loading, activeTab])
 
   // Group expiration rows are updated by Supabase Realtime above.
   // The remaining-time display uses Date.now(), so no database polling is needed.
@@ -691,12 +702,16 @@ export default function DashboardPage() {
       setPastebinOnText(result.data.pastebinon || PASTEBIN_DEFAULT_ON_TEXT)
     }
 
+    pastebinSettingsLoadedRef.current = true
     setLoadingPastebinSettings(false)
   }
 
   async function fetchFiles() {
     const { files, error } = await listFiles()
-    if (!error) setFiles(files)
+    if (!error) {
+      filesLoadedRef.current = true
+      setFiles(files)
+    }
   }
 
   async function fetchGroupExpirations() {
@@ -715,19 +730,20 @@ export default function DashboardPage() {
   }
 
   async function fetchUserConfig(userId: number) {
-    console.log('fetchUserConfig called with userId:', userId, 'Type:', typeof userId)
+    debugLog('fetchUserConfig called with userId:', userId, 'Type:', typeof userId)
     
     if (!userId || userId === null || userId === undefined) {
       console.error('Invalid userId in fetchUserConfig:', userId)
       return
     }
     
-    console.log('Fetching config for user ID:', userId)
+    debugLog('Fetching config for user ID:', userId)
     const { configText, error } = await getUserConfig(userId)
-    console.log('getUserConfig result:', { configText, error })
+    debugLog('getUserConfig result:', { configText, error })
     
     if (!error) {
-      console.log('Setting configText state to:', configText)
+      debugLog('Setting configText state to:', configText)
+      configLoadedRef.current = true
       setConfigText(configText)
     } else {
       console.error('Error fetching user config:', error)
@@ -756,6 +772,7 @@ export default function DashboardPage() {
       setUploadMessage(result.error)
     } else {
       setUploadMessage('File uploaded successfully!')
+      filesLoadedRef.current = true
       fetchFiles()
     }
     setUploading(false)
@@ -768,6 +785,7 @@ export default function DashboardPage() {
     if (result.error) {
       alert(result.error)
     } else {
+      filesLoadedRef.current = true
       fetchFiles()
     }
   }
@@ -856,7 +874,7 @@ export default function DashboardPage() {
   }
 
   async function handleSaveConfig() {
-    console.log('handleSaveConfig called, user object:', user)
+    debugLog('handleSaveConfig called, user object:', user)
     
     // Get user data directly from localStorage to bypass any state issues
     const session = localStorage.getItem('ezcrosshair_user')
@@ -868,7 +886,7 @@ export default function DashboardPage() {
     let userData
     try {
       userData = JSON.parse(session)
-      console.log('Raw user data from localStorage:', userData)
+      debugLog('Raw user data from localStorage:', userData)
     } catch (e) {
       console.error('Failed to parse user data:', e)
       setConfigMessage('Invalid session data. Please log in again.')
@@ -877,7 +895,7 @@ export default function DashboardPage() {
     
     // Try different possible ID field names
     let userId = userData.id || userData.user_id || userData.userId
-    console.log('Extracted userId:', userId, 'Type:', typeof userId)
+    debugLog('Extracted userId:', userId, 'Type:', typeof userId)
     
     // Convert to number if it's a string
     if (typeof userId === 'string') {
@@ -892,7 +910,7 @@ export default function DashboardPage() {
     
     setSavingConfig(true)
     setConfigMessage('')
-    console.log('Attempting to save config with userId:', userId)
+    debugLog('Attempting to save config with userId:', userId)
     
     const result = await saveUserConfig(userId, configText)
     if (result.error) {
@@ -1125,12 +1143,12 @@ export default function DashboardPage() {
       const now = new Date()
       const expireDate = new Date(now.getTime() + totalSeconds * 1000)
 
-      console.log('Attempting to save expiration for group:', editingGroupId, 'Expire Time:', expireDate.toISOString());
+      debugLog('Attempting to save expiration for group:', editingGroupId, 'Expire Time:', expireDate.toISOString());
       const result = await updateGroupExpiration(
         editingGroupId,
         expireDate.toISOString()
       )
-      console.log('Result from updateGroupExpiration server action:', result);
+      debugLog('Result from updateGroupExpiration server action:', result);
 
       if (result.error) {
         setManagementMessage(result.error)
@@ -1300,27 +1318,45 @@ export default function DashboardPage() {
     launchLabel = 'Launch'
   }
   const launchButtonEnabled = canLaunch && !launching
-  const isUserOnline = (userId: number) => onlineUserIds.includes(userId)
-  const sortUsersByRoleAndOnline = (a: User, b: User) => {
-    const aIsAdmin = a.role === 'admin'
-    const bIsAdmin = b.role === 'admin'
+  const onlineUserIdSet = useMemo(() => new Set(onlineUserIds), [onlineUserIds])
+  const isUserOnline = (userId: number) => onlineUserIdSet.has(userId)
 
-    if (aIsAdmin !== bIsAdmin) return aIsAdmin ? -1 : 1
+  const sortedActiveUsers = useMemo(() => {
+    return users
+      .filter(u => u.role !== 'pending')
+      .sort((a, b) => {
+        const aIsAdmin = a.role === 'admin'
+        const bIsAdmin = b.role === 'admin'
 
-    const aIsOnline = isUserOnline(a.id)
-    const bIsOnline = isUserOnline(b.id)
+        if (aIsAdmin !== bIsAdmin) return aIsAdmin ? -1 : 1
 
-    if (aIsOnline !== bIsOnline) return aIsOnline ? -1 : 1
+        const aIsOnline = onlineUserIdSet.has(a.id)
+        const bIsOnline = onlineUserIdSet.has(b.id)
 
-    return a.username.localeCompare(b.username)
-  }
-  const usersTabUsers = users
-    .filter(u => u.role !== 'pending')
-    .sort(sortUsersByRoleAndOnline)
-  const manageableUsers = users
-    .filter(u => u.role !== 'pending')
-    .sort(sortUsersByRoleAndOnline)
-  const sortedGroupExpirations = [...groupExpirations].sort((a, b) => a.group_id.localeCompare(b.group_id))
+        if (aIsOnline !== bIsOnline) return aIsOnline ? -1 : 1
+
+        return a.username.localeCompare(b.username)
+      })
+  }, [users, onlineUserIdSet])
+
+  const usersTabUsers = sortedActiveUsers
+  const manageableUsers = sortedActiveUsers
+  const sortedGroupExpirations = useMemo(
+    () => [...groupExpirations].sort((a, b) => a.group_id.localeCompare(b.group_id)),
+    [groupExpirations]
+  )
+
+  const sameGroupUsers = useMemo(() => {
+    if (!user) return []
+
+    const myGroupRaw = currentUserRow?.group_id ?? user.group_id ?? 'not set'
+    const myGroup = String(myGroupRaw)
+
+    return users
+      .filter(u => String(u.group_id || 'not set') === myGroup)
+      .filter(u => u.role !== 'pending')
+      .sort((a, b) => a.username.localeCompare(b.username))
+  }, [users, currentUserRow?.group_id, user?.group_id])
 
   const renderOnlineStatus = (userId: number) => {
     const isOnline = isUserOnline(userId)
@@ -1402,44 +1438,31 @@ export default function DashboardPage() {
               alignItems: 'center',
               maxWidth: '520px',
             }}>
-              {(() => {
-                const userId = getUserId(user)
-                const dbUser = users.find(u => u.id === userId)
-                const myGroupRaw = dbUser?.group_id ?? user.group_id ?? 'not set'
-                const myGroup = String(myGroupRaw)
-                const sameGroup = users
-                  .filter(u => String(u.group_id || 'not set') === myGroup)
-                  .filter(u => u.role !== 'pending')
-                  .sort((a, b) => a.username.localeCompare(b.username))
-
-                if (sameGroup.length === 0) {
-                  return <span style={{ color: '#5a6072', fontSize: '12px' }}>No users in your group</span>
-                }
-
-                return sameGroup.map(u => (
-                  <span key={u.id} style={{
-                    padding: '6px 10px',
-                    borderRadius: '999px',
-                    background: 'rgba(10, 12, 21, 0.65)',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    color: '#fff',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                  }}>
-                    <span style={{
-                      width: '6px',
-                      height: '6px',
-                      borderRadius: '50%',
-                      background: u.role === 'admin' ? '#ff9500' : '#00ff88',
-                      display: 'inline-block',
-                    }} />
-                    {u.username}
-                  </span>
-                ))
-              })()}
+              {sameGroupUsers.length === 0 ? (
+                <span style={{ color: '#5a6072', fontSize: '12px' }}>No users in your group</span>
+              ) : sameGroupUsers.map(u => (
+                <span key={u.id} style={{
+                  padding: '6px 10px',
+                  borderRadius: '999px',
+                  background: 'rgba(10, 12, 21, 0.65)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  color: '#fff',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}>
+                  <span style={{
+                    width: '6px',
+                    height: '6px',
+                    borderRadius: '50%',
+                    background: u.role === 'admin' ? '#ff9500' : '#00ff88',
+                    display: 'inline-block',
+                  }} />
+                  {u.username}
+                </span>
+              ))}
             </div>
           </div>
 

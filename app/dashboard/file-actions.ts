@@ -51,7 +51,7 @@ export async function listFiles() {
 
   const { data, error } = await supabase
     .from('files')
-    .select('*')
+    .select('id, filename, original_name, size, mime_type, storage_path, uploaded_by, created_at')
     .order('created_at', { ascending: false })
 
   if (error) return { files: [], error: error.message }

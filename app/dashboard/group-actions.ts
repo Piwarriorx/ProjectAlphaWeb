@@ -2,15 +2,21 @@
 
 import { createServerSupabase } from '@/lib/supabase/server'
 
+function debugLog(...args: unknown[]) {
+  if (process.env.NODE_ENV === 'development') {
+    console.log(...args)
+  }
+}
+
 export async function updateUserGroup(userId: number, groupId: string | null) {
   const supabase = await createServerSupabase()
 
-  console.log('Updating user group:', { userId, groupId })
+  debugLog('Updating user group:', { userId, groupId })
 
   const { data, error } = await supabase
     .rpc('update_user_group', { p_user_id: userId, p_group_id: groupId })
 
-  console.log('Update result:', { data, error })
+  debugLog('Update result:', { data, error })
 
   if (error) return { error: error.message }
   return { success: true, data }
@@ -34,7 +40,7 @@ export async function updateUserRole(userId: number, role: string) {
   const { data, error } = await supabase
     .rpc('update_user_role', { p_user_id: userId, p_role: role })
 
-  console.log('Role update result:', { data, error })
+  debugLog('Role update result:', { data, error })
 
   if (error) return { error: error.message }
   return { success: true, data }
@@ -46,7 +52,7 @@ export async function updateUserHwidApproval(userId: number, approved: boolean) 
   const { data, error } = await supabase
     .rpc('update_user_hwid_approval', { p_user_id: userId, p_hwid_approved: approved })
 
-  console.log('HWID approval update result:', { data, error })
+  debugLog('HWID approval update result:', { data, error })
 
   if (error) return { error: error.message }
   return { success: true, data }
@@ -103,7 +109,7 @@ export async function getAvailableGroups() {
 export async function updateGroupExpiration(groupId: string, expiretime: string) {
   const supabase = await createServerSupabase()
 
-  console.log('Calling update_group_expiration RPC with:', { group_id: groupId, expiretime });
+  debugLog('Calling update_group_expiration RPC with:', { group_id: groupId, expiretime });
 
   try {
     // Use JSONB payload to avoid parameter ordering issues
@@ -115,7 +121,7 @@ export async function updateGroupExpiration(groupId: string, expiretime: string)
       console.error('Error from update_group_expiration RPC:', error.message, error.details, error.hint);
       return { error: error.message };
     }
-    console.log('Successfully called update_group_expiration RPC. Data:', data);
+    debugLog('Successfully called update_group_expiration RPC. Data:', data);
     return { success: true, data };
   } catch (err: any) {
     console.error('Exception in updateGroupExpiration:', err);
