@@ -58,10 +58,16 @@ export async function getLaunchSettings(): Promise<LaunchSettingsResult> {
 }
 
 export async function saveLaunchSettings(
+  token: string,
   version: string,
   changelog: string
 ): Promise<LaunchSettingsResult> {
+  const nextToken = token.trim()
   const nextVersion = version.trim()
+
+  if (!nextToken) {
+    return { data: null, error: 'Token is required.' }
+  }
 
   if (!nextVersion) {
     return { data: null, error: 'Version is required.' }
@@ -69,17 +75,50 @@ export async function saveLaunchSettings(
 
   const supabase = await createServerSupabase()
 
-  // Always edit only public.user_launch_credentials row id=1.
-  // This RPC does not need to return a row; after saving, we reload id=1.
-  // The SQL migration increments banner_id every successful settings save,
-  // so users will see the latest changelog until they dismiss it.
+  // Preferred path: use the RPC below so RLS cannot block admin saves.
+  // Run update-launch-settings-token-rpc.sql once in Supabase SQL editor.
   const { error } = await supabase.rpc('update_launch_settings', {
+    p_token: nextToken,
     p_version: nextVersion,
     p_changelog: changelog || '',
   })
 
-  if (error) {
-    return { data: null, error: error.message }
+  if (!error) {
+    return getLaunchSettings()
+  }
+
+  // Fallback path: direct update for projects where RLS allows this server action.
+  const { data: currentRow, error: currentError } = await supabase
+    .from('user_launch_credentials')
+    .select('banner_id')
+    .eq('id', 1)
+    .single()
+
+  if (currentError) {
+    return {
+      data: null,
+      error: `RPC update failed: ${error.message}. Direct update lookup also failed: ${currentError.message}`,
+    }
+  }
+
+  const nextBannerId = Number(currentRow?.banner_id || 0) + 1
+
+  const { error: updateError } = await supabase
+    .from('user_launch_credentials')
+    .update({
+      token: nextToken,
+      version: nextVersion,
+      changelog: changelog || '',
+      banner_id: nextBannerId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', 1)
+
+  if (updateError) {
+    return {
+      data: null,
+      error: `RPC update failed: ${error.message}. Direct update fallback also failed: ${updateError.message}`,
+    }
   }
 
   return getLaunchSettings()

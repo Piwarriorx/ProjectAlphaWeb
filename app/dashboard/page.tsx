@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { approveUser, rejectUser } from './actions'
 import { uploadFile, listFiles, deleteFile, getSignedDownloadUrl } from './file-actions'
@@ -134,9 +134,12 @@ export default function DashboardPage() {
   const [configMessage, setConfigMessage] = useState('')
   const [savingConfig, setSavingConfig] = useState(false)
   const [settingsVersion, setSettingsVersion] = useState('')
+  const [settingsToken, setSettingsToken] = useState('')
   const [changelogText, setChangelogText] = useState('')
   const [settingsMessage, setSettingsMessage] = useState('')
   const [savingSettings, setSavingSettings] = useState(false)
+  const [loggingOutUsersRole, setLoggingOutUsersRole] = useState(false)
+  const [forceLogoutReady, setForceLogoutReady] = useState(false)
   const [managementMessage, setManagementMessage] = useState('')
   const [updatingGroup, setUpdatingGroup] = useState<number | null>(null)
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([])
@@ -155,6 +158,7 @@ export default function DashboardPage() {
   // Predefined groups
   const predefinedGroups = ['not set', '1', '2', '3', '4', '5']
   const supabase = createClient()
+  const forceLogoutChannelRef = useRef<any>(null)
 
   function applyCurrentUserRealtimeUpdate(changedUser: Partial<User> | null) {
     if (!changedUser?.id) return
@@ -453,6 +457,7 @@ export default function DashboardPage() {
 
       // Keep Settings tab fields in sync only when the admin is not actively editing them.
       if (!(user?.role === 'admin' && activeTab === 'settings')) {
+        setSettingsToken(nextLaunchData.token || '')
         setSettingsVersion(nextLaunchData.version || '')
         setChangelogText(nextLaunchData.changelog || '')
       }
@@ -563,6 +568,41 @@ export default function DashboardPage() {
   }, [user?.id, user?.user_id, user?.userId])
 
 
+  // Realtime broadcast channel for admin-triggered client logout.
+  // This logs out currently open/connected client dashboards with role="user".
+  useEffect(() => {
+    if (!user) return
+
+    setForceLogoutReady(false)
+
+    const channel = supabase
+      .channel('force-logout-clients', {
+        config: {
+          broadcast: { self: false },
+        },
+      })
+      .on('broadcast', { event: 'logout-role' }, (payload) => {
+        const targetRole = String(payload?.payload?.role || '')
+
+        if (targetRole === 'user' && user.role === 'user') {
+          localStorage.removeItem('ezcrosshair_user')
+          window.location.href = '/login'
+        }
+      })
+      .subscribe((status) => {
+        setForceLogoutReady(status === 'SUBSCRIBED')
+      })
+
+    forceLogoutChannelRef.current = channel
+
+    return () => {
+      forceLogoutChannelRef.current = null
+      setForceLogoutReady(false)
+      supabase.removeChannel(channel)
+    }
+  }, [user?.id, user?.user_id, user?.userId, user?.role])
+
+
   async function fetchUsers() {
     const { data, error } = await supabase
       .from('users')
@@ -586,6 +626,7 @@ export default function DashboardPage() {
     if (result.error) {
       console.error('Error fetching launch data:', result.error)
       setLaunchData(null)
+      setSettingsToken('')
       setSettingsVersion('')
       setChangelogText('')
       return
@@ -593,12 +634,14 @@ export default function DashboardPage() {
 
     if (!result.data) {
       setLaunchData(null)
+      setSettingsToken('')
       setSettingsVersion('')
       setChangelogText('')
       return
     }
 
     setLaunchData(result.data)
+    setSettingsToken(result.data.token || '')
     setSettingsVersion(result.data.version || '')
     setChangelogText(result.data.changelog || '')
   }
@@ -744,7 +787,13 @@ export default function DashboardPage() {
   }
 
   async function handleSaveSettings() {
+    const nextToken = settingsToken.trim()
     const nextVersion = settingsVersion.trim()
+
+    if (!nextToken) {
+      setSettingsMessage('Token is required.')
+      return
+    }
 
     if (!nextVersion) {
       setSettingsMessage('Version is required.')
@@ -754,12 +803,13 @@ export default function DashboardPage() {
     setSavingSettings(true)
     setSettingsMessage('')
 
-    const result = await saveLaunchSettings(nextVersion, changelogText)
+    const result = await saveLaunchSettings(nextToken, nextVersion, changelogText)
 
     if (result.error) {
       setSettingsMessage(result.error)
     } else if (result.data) {
       setLaunchData(result.data)
+      setSettingsToken(result.data.token || '')
       setSettingsVersion(result.data.version || '')
       setChangelogText(result.data.changelog || '')
       setSettingsMessage('Settings saved successfully!')
@@ -770,6 +820,45 @@ export default function DashboardPage() {
 
     setSavingSettings(false)
     setTimeout(() => setSettingsMessage(''), 3000)
+  }
+
+  async function handleLogoutUsersRole() {
+    if (!confirm('Logout all active client accounts with role "user"? Admin accounts will stay logged in.')) return
+
+    setLoggingOutUsersRole(true)
+    setSettingsMessage('')
+
+    try {
+      const channel = forceLogoutChannelRef.current
+
+      if (!channel || !forceLogoutReady) {
+        setSettingsMessage('Logout channel is not ready. Please refresh and try again.')
+        return
+      }
+
+      const result = await channel.send({
+        type: 'broadcast',
+        event: 'logout-role',
+        payload: {
+          role: 'user',
+          issued_by: user?.username || 'admin',
+          issued_at: new Date().toISOString(),
+        },
+      })
+
+      if (result !== 'ok') {
+        setSettingsMessage('Failed to send logout signal. Please try again.')
+        return
+      }
+
+      setSettingsMessage('Logout signal sent to all active user clients successfully!')
+    } catch (err: any) {
+      console.error('Error sending logout signal:', err)
+      setSettingsMessage(err?.message || 'Failed to send logout signal.')
+    } finally {
+      setLoggingOutUsersRole(false)
+      setTimeout(() => setSettingsMessage(''), 3000)
+    }
   }
 
   async function handleUpdateGroup(userId: number, newGroupId: string) {
@@ -1286,35 +1375,60 @@ export default function DashboardPage() {
             </button>
           </div>
 
-          <button
-            onClick={logout}
-            style={{
-              justifySelf: 'end',
-              padding: '10px 22px',
-              background: 'transparent',
-              color: '#ff6b6b',
-              border: '1.5px solid rgba(255, 107, 107, 0.4)',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: 600,
-              letterSpacing: '0.5px',
-              transition: 'all 0.25s ease',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(255, 107, 107, 0.1)'
-              e.currentTarget.style.borderColor = 'rgba(255, 107, 107, 0.7)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'transparent'
-              e.currentTarget.style.borderColor = 'rgba(255, 107, 107, 0.4)'
-            }}
-          >
-            <span style={{ fontSize: '14px' }}>→</span> Log Out
-          </button>
+          <div style={{ justifySelf: 'end', display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'stretch' }}>
+            <button
+              onClick={logout}
+              style={{
+                padding: '10px 22px',
+                background: 'transparent',
+                color: '#ff6b6b',
+                border: '1.5px solid rgba(255, 107, 107, 0.4)',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontSize: '13px',
+                fontWeight: 600,
+                letterSpacing: '0.5px',
+                transition: 'all 0.25s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255, 107, 107, 0.1)'
+                e.currentTarget.style.borderColor = 'rgba(255, 107, 107, 0.7)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent'
+                e.currentTarget.style.borderColor = 'rgba(255, 107, 107, 0.4)'
+              }}
+            >
+              <span style={{ fontSize: '14px' }}>→</span> Log Out
+            </button>
+
+            {user.role === 'admin' && (
+              <button
+                type="button"
+                onClick={handleLogoutUsersRole}
+                disabled={loggingOutUsersRole || !forceLogoutReady}
+                style={{
+                  padding: '10px 18px',
+                  background: loggingOutUsersRole || !forceLogoutReady ? 'rgba(58, 61, 78, 0.5)' : 'rgba(255, 68, 68, 0.12)',
+                  color: loggingOutUsersRole || !forceLogoutReady ? '#5a6072' : '#ff4444',
+                  border: `1.5px solid ${loggingOutUsersRole || !forceLogoutReady ? 'rgba(90, 96, 114, 0.35)' : 'rgba(255, 68, 68, 0.4)'}`,
+                  borderRadius: '8px',
+                  cursor: loggingOutUsersRole || !forceLogoutReady ? 'not-allowed' : 'pointer',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  letterSpacing: '0.4px',
+                  transition: 'all 0.25s ease',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {loggingOutUsersRole ? 'Logging out...' : 'Logout All Clients'}
+              </button>
+            )}
+          </div>
         </div>
 
 
@@ -1851,7 +1965,7 @@ export default function DashboardPage() {
                     Settings
                   </h2>
                   <p style={{ color: '#5a6072', fontSize: '13px', margin: '6px 0 0' }}>
-                    Edit the launcher version and changelog text.
+                    Edit the launcher token, version, and changelog text.
                   </p>
                 </div>
                 {settingsMessage && (
@@ -1871,10 +1985,46 @@ export default function DashboardPage() {
 
               <div style={{
                 display: 'grid',
-                gridTemplateColumns: '160px 240px 1fr',
+                gridTemplateColumns: 'minmax(240px, 1fr) minmax(160px, 240px)',
                 gap: '20px',
                 marginBottom: '24px',
               }}>
+                <div>
+                  <label style={{
+                    display: 'block',
+                    color: '#fff',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    marginBottom: '12px',
+                  }}>
+                    Token
+                  </label>
+                  <input
+                    type="text"
+                    value={settingsToken}
+                    onChange={(e) => setSettingsToken(e.target.value)}
+                    placeholder="Enter launcher token"
+                    style={{
+                      width: '100%',
+                      background: 'rgba(10, 12, 21, 0.8)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      padding: '14px 16px',
+                      color: '#fff',
+                      fontSize: '14px',
+                      fontFamily: 'monospace',
+                      outline: 'none',
+                      transition: 'all 0.2s ease',
+                      boxSizing: 'border-box',
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(255, 149, 0, 0.5)'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
+                    }}
+                  />
+                </div>
 
                 <div>
                   <label style={{
@@ -1902,6 +2052,7 @@ export default function DashboardPage() {
                       fontFamily: 'monospace',
                       outline: 'none',
                       transition: 'all 0.2s ease',
+                      boxSizing: 'border-box',
                     }}
                     onFocus={(e) => {
                       e.currentTarget.style.borderColor = 'rgba(255, 149, 0, 0.5)'
@@ -1913,42 +2064,42 @@ export default function DashboardPage() {
                 </div>
 
                 <div style={{ gridColumn: '1 / -1', width: '100%' }}>
-  <label style={{
-    display: 'block',
-    color: '#fff',
-    fontSize: '14px',
-    fontWeight: 600,
-    marginBottom: '12px',
-  }}>
-    Changelogs
-  </label>
-  <textarea
-    value={changelogText}
-    onChange={(e) => setChangelogText(e.target.value)}
-    placeholder="Enter changelogs here..."
-    style={{
-      width: '100%',
-      minHeight: '220px',
-      background: 'rgba(10, 12, 21, 0.8)',
-      border: '1px solid rgba(255, 255, 255, 0.1)',
-      borderRadius: '8px',
-      padding: '16px',
-      color: '#fff',
-      fontSize: '14px',
-      fontFamily: 'monospace',
-      resize: 'vertical',
-      outline: 'none',
-      transition: 'all 0.2s ease',
-      boxSizing: 'border-box',
-    }}
-    onFocus={(e) => {
-      e.currentTarget.style.borderColor = 'rgba(255, 149, 0, 0.5)'
-    }}
-    onBlur={(e) => {
-      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
-    }}
-  />
-</div>
+                  <label style={{
+                    display: 'block',
+                    color: '#fff',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    marginBottom: '12px',
+                  }}>
+                    Changelogs
+                  </label>
+                  <textarea
+                    value={changelogText}
+                    onChange={(e) => setChangelogText(e.target.value)}
+                    placeholder="Enter changelogs here..."
+                    style={{
+                      width: '100%',
+                      minHeight: '220px',
+                      background: 'rgba(10, 12, 21, 0.8)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      padding: '16px',
+                      color: '#fff',
+                      fontSize: '14px',
+                      fontFamily: 'monospace',
+                      resize: 'vertical',
+                      outline: 'none',
+                      transition: 'all 0.2s ease',
+                      boxSizing: 'border-box',
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(255, 149, 0, 0.5)'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
+                    }}
+                  />
+                </div>
               </div>
 
               <div style={{
@@ -1959,7 +2110,8 @@ export default function DashboardPage() {
                 borderTop: '1px solid rgba(255,255,255,0.05)',
               }}>
                 <div style={{ color: '#5a6072', fontSize: '13px' }}>
-                  <span style={{ marginLeft: '14px' }}>ID: <span style={{ color: '#fff', fontFamily: 'monospace' }}>{launchData?.token || 'not set'}</span></span>
+                  <span>Row ID: <span style={{ color: '#fff', fontFamily: 'monospace' }}>{launchData?.id || LAUNCH_CREDENTIAL_ID}</span></span>
+                  <span style={{ marginLeft: '14px' }}>Last update: <span style={{ color: '#fff', fontFamily: 'monospace' }}>{launchData?.updated_at ? formatDateTime(launchData.updated_at) : 'not set'}</span></span>
                 </div>
                 <button
                   onClick={handleSaveSettings}
