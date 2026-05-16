@@ -115,8 +115,6 @@ function getUserId(user: User | null) {
 }
 
 const LAUNCH_CREDENTIAL_ID = 1
-const SESSION_TIMEOUT_MS = 1 * 60 * 1000 // 5 minutes
-const LOGIN_STARTED_AT_KEY = 'ezcrosshair_login_started_at'
 
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null)
@@ -157,39 +155,6 @@ export default function DashboardPage() {
   // Predefined groups
   const predefinedGroups = ['not set', '1', '2', '3', '4', '5']
   const supabase = createClient()
-
-  // Fixed 5-minute session timer. This logs out the user 5 minutes
-  // after the login timestamp is created, even if the user is active.
-  useEffect(() => {
-    if (!user) return
-
-    const startedAtRaw = localStorage.getItem(LOGIN_STARTED_AT_KEY)
-    const parsedStartedAt = startedAtRaw ? Number(startedAtRaw) : NaN
-    const startedAt = Number.isFinite(parsedStartedAt) ? parsedStartedAt : Date.now()
-
-    // If the login page has not stored a timestamp yet, start it now.
-    // For the most accurate timing, also set this key right after login success.
-    if (!startedAtRaw || !Number.isFinite(parsedStartedAt)) {
-      localStorage.setItem(LOGIN_STARTED_AT_KEY, String(startedAt))
-    }
-
-    const remainingMs = SESSION_TIMEOUT_MS - (Date.now() - startedAt)
-
-    const forceLogout = () => {
-      localStorage.removeItem('ezcrosshair_user')
-      localStorage.removeItem(LOGIN_STARTED_AT_KEY)
-      window.location.href = '/login'
-    }
-
-    if (remainingMs <= 0) {
-      forceLogout()
-      return
-    }
-
-    const timeoutId = setTimeout(forceLogout, remainingMs)
-
-    return () => clearTimeout(timeoutId)
-  }, [user])
 
   function applyCurrentUserRealtimeUpdate(changedUser: Partial<User> | null) {
     if (!changedUser?.id) return
@@ -344,7 +309,6 @@ export default function DashboardPage() {
   useEffect(() => {
     const session = localStorage.getItem('ezcrosshair_user')
     if (!session) {
-      localStorage.removeItem(LOGIN_STARTED_AT_KEY)
       window.location.href = '/login'
       return
     }
@@ -392,7 +356,6 @@ export default function DashboardPage() {
     const currentUserId = getUserId(user)
     if (!currentUserId) {
       localStorage.removeItem('ezcrosshair_user')
-      localStorage.removeItem(LOGIN_STARTED_AT_KEY)
       window.location.href = '/login'
       return
     }
@@ -403,7 +366,6 @@ export default function DashboardPage() {
     // This covers missed realtime DELETE events or reconnect gaps.
     if (!currentUserRow) {
       localStorage.removeItem('ezcrosshair_user')
-      localStorage.removeItem(LOGIN_STARTED_AT_KEY)
       window.location.href = '/login'
       return
     }
@@ -411,7 +373,6 @@ export default function DashboardPage() {
     // If an admin moves this account back to pending/rejected, invalidate the local session.
     if (currentUserRow.role === 'pending') {
       localStorage.removeItem('ezcrosshair_user')
-      localStorage.removeItem(LOGIN_STARTED_AT_KEY)
       window.location.href = '/login'
       return
     }
@@ -542,7 +503,6 @@ export default function DashboardPage() {
 
     const logoutCurrentSession = () => {
       localStorage.removeItem('ezcrosshair_user')
-      localStorage.removeItem(LOGIN_STARTED_AT_KEY)
       window.location.href = '/login'
     }
 
@@ -1070,7 +1030,6 @@ export default function DashboardPage() {
 
   function logout() {
     localStorage.removeItem('ezcrosshair_user')
-    localStorage.removeItem(LOGIN_STARTED_AT_KEY)
     window.location.href = '/login'
   }
 
