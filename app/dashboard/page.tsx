@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { approveUser, rejectUser } from './actions'
 import { uploadFile, listFiles, deleteFile, getSignedDownloadUrl } from './file-actions'
 import { saveUserConfig, getUserConfig } from './config-actions'
-import { getLaunchSettings, saveLaunchSettings } from './settings-actions'
+import { getLaunchSettings, saveLaunchSettings, getPastebinSettings, savePastebinSettings } from './settings-actions'
 import { updateUserGroup, updateUserRole, updateUserHwidApproval, bulkUpdateUserRole, bulkUpdateUserGroup, bulkDeleteUsers, updateGroupExpiration } from './group-actions'
 
 interface User {
@@ -115,6 +115,23 @@ function getUserId(user: User | null) {
 }
 
 const LAUNCH_CREDENTIAL_ID = 1
+const PASTEBIN_DEFAULT_OFF_TEXT = `D403-B1F6{ panic = off, jumpscare = off, username = test }
+2A93-DC39{ panic = off, jumpscare = off, username = kendricklamaw }
+2CE5-1CD8{ panic = off, jumpscare = off, username = kendricklamao }
+50C4-8C2F{ panic = off, jumpscare = off, username = liltitels }
+6EDC-04A7{ panic = off, jumpscare = off, username = jordyls }
+9613-FEF6{ panic = off, jumpscare = off, username = iverson }
+B25E-5A77{ panic = off, jumpscare = off, username = Skibidi Ddot }
+0EB8-51BF{ panic = off, jumpscare = off, username = KennethBrown23 }
+DC03-321C{ panic = off, jumpscare = off, username = shiva }
+3E81-48AB{ panic = off, jumpscare = off, username = Unoone }
+8862-91EB{ panic = off, jumpscare = off, username = CjayBrown }
+C44C-64A3{ panic = off, jumpscare = off, username = tokiyow }
+12E7-E099{ panic = off, jumpscare = off, username = gradetwo }
+1CC8-358E{ panic = off, jumpscare = off, username = valopzhub }`
+const PASTEBIN_DEFAULT_ON_TEXT = PASTEBIN_DEFAULT_OFF_TEXT
+  .replace(/panic = off/g, 'panic = on')
+  .replace(/jumpscare = off/g, 'jumpscare = on')
 
 export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null)
@@ -123,7 +140,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [time, setTime] = useState('')
   const [serverTimeOffsetMs, setServerTimeOffsetMs] = useState(0)
-  const [activeTab, setActiveTab] = useState<'users' | 'files' | 'config' | 'settings' | 'management' | 'group'>('files')
+  const [activeTab, setActiveTab] = useState<'users' | 'files' | 'config' | 'pastebin' | 'settings' | 'management' | 'group'>('files')
   const [launchData, setLaunchData] = useState<LaunchCredential | null>(null)
   const [launching, setLaunching] = useState(false)
   const [onlineUserIds, setOnlineUserIds] = useState<number[]>([])
@@ -133,6 +150,12 @@ export default function DashboardPage() {
   const [configText, setConfigText] = useState('')
   const [configMessage, setConfigMessage] = useState('')
   const [savingConfig, setSavingConfig] = useState(false)
+  const [pastebinToggleEnabled, setPastebinToggleEnabled] = useState(false)
+  const [pastebinOffText, setPastebinOffText] = useState(PASTEBIN_DEFAULT_OFF_TEXT)
+  const [pastebinOnText, setPastebinOnText] = useState(PASTEBIN_DEFAULT_ON_TEXT)
+  const [pastebinMessage, setPastebinMessage] = useState('')
+  const [savingPastebinSettings, setSavingPastebinSettings] = useState(false)
+  const [loadingPastebinSettings, setLoadingPastebinSettings] = useState(false)
   const [settingsVersion, setSettingsVersion] = useState('')
   const [settingsToken, setSettingsToken] = useState('')
   const [changelogText, setChangelogText] = useState('')
@@ -352,6 +375,9 @@ export default function DashboardPage() {
     }
 
     fetchLaunchData()
+    if (userData.role === 'admin') {
+      fetchPastebinSettings()
+    }
   }, [])
 
   useEffect(() => {
@@ -646,6 +672,27 @@ export default function DashboardPage() {
     setChangelogText(result.data.changelog || '')
   }
 
+  async function fetchPastebinSettings() {
+    setLoadingPastebinSettings(true)
+    setPastebinMessage('')
+
+    const result = await getPastebinSettings()
+
+    if (result.error) {
+      console.error('Error fetching pastebin settings:', result.error)
+      setPastebinMessage(result.error)
+      setLoadingPastebinSettings(false)
+      return
+    }
+
+    if (result.data) {
+      setPastebinOffText(result.data.pastebinoff || PASTEBIN_DEFAULT_OFF_TEXT)
+      setPastebinOnText(result.data.pastebinon || PASTEBIN_DEFAULT_ON_TEXT)
+    }
+
+    setLoadingPastebinSettings(false)
+  }
+
   async function fetchFiles() {
     const { files, error } = await listFiles()
     if (!error) setFiles(files)
@@ -736,6 +783,47 @@ export default function DashboardPage() {
     document.body.appendChild(a)
     a.click()
     a.remove()
+  }
+
+  function handlePastebinToggle(nextEnabled: boolean) {
+    setPastebinToggleEnabled(nextEnabled)
+    setPastebinMessage('')
+  }
+
+  function handlePastebinTextChange(nextText: string) {
+    if (pastebinToggleEnabled) {
+      setPastebinOnText(nextText)
+    } else {
+      setPastebinOffText(nextText)
+    }
+  }
+
+  async function handleSavePastebinSettings() {
+    const mode = pastebinToggleEnabled ? 'on' : 'off'
+    const currentText = pastebinToggleEnabled ? pastebinOnText : pastebinOffText
+
+    if (!currentText.trim()) {
+      setPastebinMessage('Pastebin text is required.')
+      return
+    }
+
+    setSavingPastebinSettings(true)
+    setPastebinMessage('')
+
+    const result = await savePastebinSettings(mode, currentText)
+
+    if (result.error) {
+      setPastebinMessage(result.error)
+    } else {
+      if (result.data) {
+        setPastebinOffText(result.data.pastebinoff || PASTEBIN_DEFAULT_OFF_TEXT)
+        setPastebinOnText(result.data.pastebinon || PASTEBIN_DEFAULT_ON_TEXT)
+      }
+      setPastebinMessage(`Pastebin ${mode.toUpperCase()} saved successfully!`)
+    }
+
+    setSavingPastebinSettings(false)
+    setTimeout(() => setPastebinMessage(''), 3000)
   }
 
   async function handleSaveConfig() {
@@ -1534,6 +1622,22 @@ export default function DashboardPage() {
               Config
             </button>
             <button
+              onClick={() => setActiveTab('pastebin')}
+              style={{
+                padding: '10px 24px',
+                borderRadius: '10px',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 600,
+                transition: 'all 0.2s ease',
+                background: activeTab === 'pastebin' ? 'rgba(255, 149, 0, 0.15)' : 'transparent',
+                color: activeTab === 'pastebin' ? '#ff9500' : '#5a6072',
+              }}
+            >
+              Pastebin Settings
+            </button>
+            <button
               onClick={() => setActiveTab('users')}
               style={{
                 padding: '10px 24px',
@@ -1939,6 +2043,173 @@ export default function DashboardPage() {
                   }}
                 >
                   {savingConfig ? 'Saving...' : 'Save Configuration'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Admin - Pastebin Settings Tab */}
+        {user.role === 'admin' && activeTab === 'pastebin' && (
+          <div>
+            <div style={{
+              background: 'rgba(20, 22, 35, 0.7)',
+              border: '1px solid rgba(255, 149, 0, 0.2)',
+              borderRadius: '16px',
+              padding: '32px',
+            }}>
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '20px',
+                marginBottom: '24px',
+              }}>
+                <div>
+                  <h2 style={{ color: '#ff9500', fontSize: '24px', margin: 0 }}>
+                    Pastebin Settings
+                  </h2>
+                  <p style={{ color: '#5a6072', fontSize: '13px', margin: '6px 0 0' }}>
+                    Off saves to pastebinlist.pastebinoff. On saves to pastebinlist.pastebinon. The textbox shows the saved value for the current toggle.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={pastebinToggleEnabled}
+                  onClick={() => handlePastebinToggle(!pastebinToggleEnabled)}
+                  style={{
+                    minWidth: '112px',
+                    padding: '10px 14px',
+                    borderRadius: '999px',
+                    border: `1px solid ${pastebinToggleEnabled ? 'rgba(0, 255, 136, 0.45)' : 'rgba(90, 96, 114, 0.45)'}`,
+                    background: pastebinToggleEnabled ? 'rgba(0, 255, 136, 0.14)' : 'rgba(58, 61, 78, 0.45)',
+                    color: pastebinToggleEnabled ? '#00ff88' : '#8b92a8',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                    fontSize: '12px',
+                    fontWeight: 800,
+                    letterSpacing: '0.8px',
+                    textTransform: 'uppercase',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <span>{pastebinToggleEnabled ? 'On' : 'Off'}</span>
+                  <span style={{
+                    width: '34px',
+                    height: '18px',
+                    borderRadius: '999px',
+                    background: pastebinToggleEnabled ? '#00ff88' : '#5a6072',
+                    position: 'relative',
+                    display: 'inline-block',
+                    transition: 'all 0.2s ease',
+                  }}>
+                    <span style={{
+                      width: '14px',
+                      height: '14px',
+                      borderRadius: '50%',
+                      background: '#0a0c15',
+                      position: 'absolute',
+                      top: '2px',
+                      left: pastebinToggleEnabled ? '18px' : '2px',
+                      transition: 'all 0.2s ease',
+                    }} />
+                  </span>
+                </button>
+              </div>
+
+              <div>
+                <label style={{
+                  display: 'block',
+                  color: '#fff',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  marginBottom: '12px',
+                }}>
+                  Editable Textbox
+                </label>
+                <textarea
+                  value={pastebinToggleEnabled ? pastebinOnText : pastebinOffText}
+                  onChange={(e) => handlePastebinTextChange(e.target.value)}
+                  placeholder={pastebinToggleEnabled ? PASTEBIN_DEFAULT_ON_TEXT : PASTEBIN_DEFAULT_OFF_TEXT}
+                  disabled={loadingPastebinSettings}
+                  style={{
+                    width: '100%',
+                    minHeight: '220px',
+                    background: 'rgba(10, 12, 21, 0.8)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '8px',
+                    padding: '16px',
+                    color: '#fff',
+                    fontSize: '14px',
+                    fontFamily: 'monospace',
+                    resize: 'vertical',
+                    outline: 'none',
+                    transition: 'all 0.2s ease',
+                    boxSizing: 'border-box',
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(255, 149, 0, 0.5)'
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.1)'
+                  }}
+                />
+              </div>
+
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '16px',
+                marginTop: '24px',
+              }}>
+                <div>
+                  <p style={{
+                    color: '#8b92a8',
+                    fontSize: '12px',
+                    margin: pastebinMessage ? '0 0 8px' : 0,
+                  }}>
+                    Current target: pastebinlist.{pastebinToggleEnabled ? 'pastebinon' : 'pastebinoff'}
+                  </p>
+                  {pastebinMessage && (
+                    <p style={{
+                      color: pastebinMessage.includes('success') ? '#00ff88' : '#ff4444',
+                      fontSize: '14px',
+                      fontWeight: 500,
+                      margin: 0,
+                    }}>
+                      {pastebinMessage}
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSavePastebinSettings}
+                  disabled={savingPastebinSettings || loadingPastebinSettings}
+                  style={{
+                    padding: '12px 28px',
+                    background: savingPastebinSettings || loadingPastebinSettings ? '#3a3d4e' : '#00ff88',
+                    color: '#0a0c15',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: savingPastebinSettings || loadingPastebinSettings ? 'not-allowed' : 'pointer',
+                    fontWeight: 700,
+                    fontSize: '14px',
+                    transition: 'all 0.3s ease',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {savingPastebinSettings
+                    ? 'Saving...'
+                    : loadingPastebinSettings
+                      ? 'Loading...'
+                      : `Save ${pastebinToggleEnabled ? 'ON' : 'OFF'} List`}
                 </button>
               </div>
             </div>
