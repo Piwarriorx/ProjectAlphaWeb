@@ -115,6 +115,7 @@ function getUserId(user: User | null) {
 }
 
 const LAUNCH_CREDENTIAL_ID = 1
+const PASTEBIN_EDIT_URL = 'https://pastebin.com/edit/gwrw1wdk'
 const PASTEBIN_DEFAULT_OFF_TEXT = `D403-B1F6{ panic = off, jumpscare = off, username = test }
 2A93-DC39{ panic = off, jumpscare = off, username = kendricklamaw }
 2CE5-1CD8{ panic = off, jumpscare = off, username = kendricklamao }
@@ -796,6 +797,34 @@ export default function DashboardPage() {
     } else {
       setPastebinOffText(nextText)
     }
+  }
+
+  async function handleCopyPastebinText() {
+    const currentText = pastebinToggleEnabled ? pastebinOnText : pastebinOffText
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(currentText)
+      } else {
+        const textarea = document.createElement('textarea')
+        textarea.value = currentText
+        textarea.style.position = 'fixed'
+        textarea.style.left = '-9999px'
+        textarea.style.top = '0'
+        document.body.appendChild(textarea)
+        textarea.focus()
+        textarea.select()
+        document.execCommand('copy')
+        textarea.remove()
+      }
+
+      setPastebinMessage('Textbox content copied!')
+    } catch (err) {
+      console.error('Failed to copy pastebin textbox:', err)
+      setPastebinMessage('Failed to copy textbox content.')
+    }
+
+    setTimeout(() => setPastebinMessage(''), 3000)
   }
 
   async function handleSavePastebinSettings() {
@@ -1622,22 +1651,6 @@ export default function DashboardPage() {
               Config
             </button>
             <button
-              onClick={() => setActiveTab('pastebin')}
-              style={{
-                padding: '10px 24px',
-                borderRadius: '10px',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '14px',
-                fontWeight: 600,
-                transition: 'all 0.2s ease',
-                background: activeTab === 'pastebin' ? 'rgba(255, 149, 0, 0.15)' : 'transparent',
-                color: activeTab === 'pastebin' ? '#ff9500' : '#5a6072',
-              }}
-            >
-              Pastebin Settings
-            </button>
-            <button
               onClick={() => setActiveTab('users')}
               style={{
                 padding: '10px 24px',
@@ -1684,6 +1697,22 @@ export default function DashboardPage() {
               }}
             >
               Group
+            </button>
+            <button
+              onClick={() => setActiveTab('pastebin')}
+              style={{
+                padding: '10px 24px',
+                borderRadius: '10px',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: 600,
+                transition: 'all 0.2s ease',
+                background: activeTab === 'pastebin' ? 'rgba(255, 149, 0, 0.15)' : 'transparent',
+                color: activeTab === 'pastebin' ? '#ff9500' : '#5a6072',
+              }}
+            >
+              Pastebin Settings
             </button>
             <button
               onClick={() => setActiveTab('settings')}
@@ -2123,15 +2152,61 @@ export default function DashboardPage() {
               </div>
 
               <div>
-                <label style={{
-                  display: 'block',
-                  color: '#fff',
-                  fontSize: '14px',
-                  fontWeight: 600,
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '12px',
                   marginBottom: '12px',
+                  flexWrap: 'wrap',
                 }}>
-                  Editable Textbox
-                </label>
+                  <label style={{
+                    display: 'block',
+                    color: '#fff',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                  }}>
+                    Editable Textbox
+                  </label>
+
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={() => window.open(PASTEBIN_EDIT_URL, '_blank', 'noopener,noreferrer')}
+                      style={{
+                        padding: '9px 14px',
+                        background: 'rgba(255, 149, 0, 0.12)',
+                        color: '#ff9500',
+                        border: '1px solid rgba(255, 149, 0, 0.35)',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      Open Pastebin
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCopyPastebinText}
+                      disabled={loadingPastebinSettings}
+                      style={{
+                        padding: '9px 14px',
+                        background: loadingPastebinSettings ? 'rgba(58, 61, 78, 0.5)' : 'rgba(0, 255, 136, 0.12)',
+                        color: loadingPastebinSettings ? '#5a6072' : '#00ff88',
+                        border: `1px solid ${loadingPastebinSettings ? 'rgba(90, 96, 114, 0.35)' : 'rgba(0, 255, 136, 0.35)'}`,
+                        borderRadius: '8px',
+                        cursor: loadingPastebinSettings ? 'not-allowed' : 'pointer',
+                        fontSize: '12px',
+                        fontWeight: 700,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      Copy Textbox
+                    </button>
+                  </div>
+                </div>
                 <textarea
                   value={pastebinToggleEnabled ? pastebinOnText : pastebinOffText}
                   onChange={(e) => handlePastebinTextChange(e.target.value)}
