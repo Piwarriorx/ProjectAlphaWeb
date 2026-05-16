@@ -1393,11 +1393,167 @@ export default function DashboardPage() {
   if (loading) return <div style={{ color: '#fff', padding: 32 }}>Loading...</div>
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0c15', padding: '32px' }}>
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+    <div className="pa-dashboard-shell" style={{ minHeight: '100vh', background: '#0a0c15', padding: '32px' }}>
+      <div className="pa-dashboard-container" style={{ maxWidth: '1200px', margin: '0 auto' }}>
+        <style>{`
+          .pa-dashboard-shell {
+            overflow-x: hidden;
+            -webkit-text-size-adjust: 100%;
+          }
+
+          .pa-dashboard-container,
+          .pa-dashboard-container * {
+            box-sizing: border-box;
+          }
+
+          .pa-dashboard-container button,
+          .pa-dashboard-container input,
+          .pa-dashboard-container select,
+          .pa-dashboard-container textarea {
+            touch-action: manipulation;
+          }
+
+          .pa-dashboard-container input,
+          .pa-dashboard-container select,
+          .pa-dashboard-container textarea {
+            max-width: 100%;
+          }
+
+          @media (max-width: 900px) {
+            .pa-dashboard-shell {
+              padding: max(16px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)) !important;
+            }
+
+            .pa-dashboard-container {
+              max-width: 100% !important;
+              width: 100% !important;
+            }
+
+            .pa-dashboard-header {
+              grid-template-columns: 1fr !important;
+              gap: 18px !important;
+              margin-bottom: 22px !important;
+              padding-bottom: 18px !important;
+              min-width: 0 !important;
+            }
+
+            .pa-dashboard-header h1 {
+              font-size: 28px !important;
+              line-height: 1.15 !important;
+            }
+
+            .pa-dashboard-header p {
+              font-size: 16px !important;
+            }
+
+            .pa-launch-wrap {
+              justify-content: stretch !important;
+              width: 100% !important;
+            }
+
+            .pa-launch-wrap > button,
+            .pa-header-actions > button {
+              width: 100% !important;
+              min-width: 0 !important;
+            }
+
+            .pa-header-actions {
+              justify-self: stretch !important;
+              width: 100% !important;
+            }
+
+            .pa-admin-tabs {
+              width: 100% !important;
+              max-width: 100% !important;
+              overflow-x: auto !important;
+              overflow-y: hidden !important;
+              -webkit-overflow-scrolling: touch;
+              scrollbar-width: thin;
+              padding: 4px !important;
+              margin-bottom: 22px !important;
+            }
+
+            .pa-admin-tabs button {
+              flex: 0 0 auto !important;
+              padding: 10px 16px !important;
+              white-space: nowrap !important;
+            }
+
+            .pa-dashboard-container h2 {
+              font-size: 20px !important;
+              line-height: 1.25 !important;
+            }
+
+            .pa-dashboard-container [style*="overflow: hidden"] {
+              overflow-x: auto !important;
+              -webkit-overflow-scrolling: touch;
+            }
+
+            .pa-dashboard-container [style*="grid-template-columns: minmax(140px, 1fr) 110px 120px 170px 200px 200px"],
+            .pa-dashboard-container [style*="grid-template-columns: 1fr 100px 120px 160px"],
+            .pa-dashboard-container [style*="grid-template-columns: 48px 1fr 120px minmax(180px, 240px) 150px"],
+            .pa-dashboard-container [style*="grid-template-columns: 1fr 170px 170px 130px 190px"],
+            .pa-dashboard-container [style*="grid-template-columns: 1fr minmax(220px, 1.6fr) 140px 140px"],
+            .pa-dashboard-container [style*="grid-template-columns: 80px 1.2fr 1.2fr 1fr 1.5fr 100px"] {
+              min-width: 760px !important;
+            }
+
+            .pa-dashboard-container [style*="grid-template-columns: 1fr 100px 120px 160px"] {
+              min-width: 620px !important;
+            }
+
+            .pa-dashboard-container [style*="grid-template-columns: 1fr minmax(220px, 1.6fr) 140px 140px"],
+            .pa-dashboard-container [style*="grid-template-columns: 80px 1.2fr 1.2fr 1fr 1.5fr 100px"] {
+              min-width: 820px !important;
+            }
+
+            .pa-dashboard-container [style*="grid-template-columns: minmax(240px, 1fr) minmax(160px, 240px)"] {
+              grid-template-columns: 1fr !important;
+              min-width: 0 !important;
+            }
+
+            .pa-dashboard-container textarea {
+              width: 100% !important;
+              min-height: 220px;
+              font-size: 16px !important;
+            }
+
+            .pa-dashboard-container input,
+            .pa-dashboard-container select {
+              font-size: 16px !important;
+            }
+          }
+
+          @media (max-width: 520px) {
+            .pa-dashboard-shell {
+              padding: 12px !important;
+            }
+
+            .pa-dashboard-header h1 {
+              font-size: 24px !important;
+            }
+
+            .pa-dashboard-header [style*="font-family: monospace"] {
+              font-size: 15px !important;
+              letter-spacing: 0.5px !important;
+              overflow-wrap: anywhere;
+            }
+
+            .pa-dashboard-container [style*="padding: 24px"],
+            .pa-dashboard-container [style*="padding: '24px'"] {
+              padding: 16px !important;
+            }
+
+            .pa-dashboard-container [style*="display: flex"][style*="gap: 12px"],
+            .pa-dashboard-container [style*="display: flex"][style*="gap: '12px'"] {
+              flex-wrap: wrap !important;
+            }
+          }
+        `}</style>
+
 
         {/* Header */}
-        <div style={{
+        <div className="pa-dashboard-header" style={{
           display: 'grid',
           gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)',
           alignItems: 'center',
@@ -1466,7 +1622,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'center' }}>
+                    <div className="pa-launch-wrap" style={{ display: 'flex', justifyContent: 'center' }}>
             <button
               onClick={handleLaunch}
               disabled={!launchButtonEnabled}
@@ -1515,7 +1671,7 @@ export default function DashboardPage() {
             </button>
           </div>
 
-          <div style={{ justifySelf: 'end', display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'stretch' }}>
+          <div className="pa-header-actions" style={{ justifySelf: 'end', display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'stretch' }}>
             <button
               onClick={logout}
               style={{
@@ -1632,7 +1788,7 @@ export default function DashboardPage() {
 
         {/* Admin Tabs */}
         {user.role === 'admin' && (
-          <div style={{
+          <div className="pa-admin-tabs" style={{
             display: 'flex',
             gap: '4px',
             marginBottom: '32px',
