@@ -115,7 +115,7 @@ function getUserId(user: User | null) {
 }
 
 const LAUNCH_CREDENTIAL_ID = 1
-const SESSION_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes
+const SESSION_TIMEOUT_MS = 1 * 60 * 1000 // 5 minutes
 const LOGIN_STARTED_AT_KEY = 'ezcrosshair_login_started_at'
 
 export default function DashboardPage() {
