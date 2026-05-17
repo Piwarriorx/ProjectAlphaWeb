@@ -133,33 +133,17 @@ export default function LoginPage() {
 
     const particlesContainer = document.getElementById('particles')
     if (particlesContainer && particlesContainer.children.length === 0) {
-      for (let i = 0; i < 20; i++) {
+      for (let i = 0; i < 28; i++) {
         const particle = document.createElement('div')
         particle.className = 'particle'
-        particle.style.left = Math.random() * 100 + '%'
-        particle.style.animationDelay = Math.random() * 15 + 's'
-        particle.style.animationDuration = (15 + Math.random() * 10) + 's'
+        particle.style.left = `${Math.random() * 100}%`
+        particle.style.animationDelay = `${Math.random() * 16}s`
+        particle.style.animationDuration = `${14 + Math.random() * 12}s`
+        particle.style.setProperty('--drift', `${Math.random() * 140 - 70}px`)
+        particle.style.setProperty('--size', `${2 + Math.random() * 4}px`)
         particlesContainer.appendChild(particle)
       }
     }
-
-    const inputs = document.querySelectorAll('input')
-    inputs.forEach(input => {
-      input.addEventListener('focus', function() {
-        const parent = this.parentElement
-        if (parent) {
-          parent.style.transform = 'scale(1.02)'
-          parent.style.transition = 'transform 0.3s ease'
-        }
-      })
-      
-      input.addEventListener('blur', function() {
-        const parent = this.parentElement
-        if (parent) {
-          parent.style.transform = 'scale(1)'
-        }
-      })
-    })
   }, [])
 
   useEffect(() => {
@@ -248,27 +232,26 @@ export default function LoginPage() {
     }
   }, [pendingUser?.id, pendingUser?.username])
 
-
   async function handleLogin(formData: FormData) {
-  setMessage('')
-  const result = await login(formData)
-  
-  if (result?.error) {
-    setMessage(result.error)
-    return
+    setMessage('')
+    const result = await login(formData)
+
+    if (result?.error) {
+      setMessage(result.error)
+      return
+    }
+
+    if (result?.success === 'login' && result?.userId) {
+      localStorage.setItem('ezcrosshair_user', JSON.stringify({
+        id: result.userId,
+        userId: result.userId,
+        username: result.username,
+        role: result.role,
+      }))
+
+      window.location.href = result.redirectTo || '/dashboard'
+    }
   }
-  
-  if (result?.success === 'login' && result?.userId) {
-    localStorage.setItem('ezcrosshair_user', JSON.stringify({
-      id: result.userId,
-      userId: result.userId,
-      username: result.username,
-      role: result.role  // <-- Store role
-    }))
-    
-    window.location.href = result.redirectTo || '/dashboard'
-  }
-}
 
   async function handleRegister(formData: FormData) {
     setMessage('')
@@ -296,27 +279,105 @@ export default function LoginPage() {
     }
   }
 
+  const normalizedMessage = message.toLowerCase()
+  const isPositiveMessage =
+    normalizedMessage.includes('success') ||
+    normalizedMessage.includes('created') ||
+    normalizedMessage.includes('approval') ||
+    normalizedMessage.includes('approved') ||
+    normalizedMessage.includes('redirecting') ||
+    normalizedMessage.includes('wait') ||
+    normalizedMessage.includes('pending')
+  const messageIcon = isPositiveMessage
+    ? normalizedMessage.includes('wait') || normalizedMessage.includes('pending')
+      ? '⏳'
+      : '✓'
+    : '⚠'
+
   return (
     <>
       <style jsx global>{`
         :root {
           --accent-primary: #ff9500;
-          --accent-glow: rgba(255, 149, 0, 0.5);
-          --text-secondary: #8b92a8;
-          --text-muted: #5a6072;
+          --accent-secondary: #ff7700;
+          --accent-soft: rgba(255, 149, 0, 0.12);
+          --accent-glow: rgba(255, 149, 0, 0.52);
+          --accent-glow-strong: rgba(255, 149, 0, 0.78);
+          --bg-deep: #070912;
+          --bg-card: rgba(14, 17, 30, 0.72);
+          --bg-field: rgba(3, 6, 14, 0.62);
+          --text-primary: #fff7eb;
+          --text-secondary: #a4acbf;
+          --text-muted: #626a80;
           --glass-border: rgba(255, 255, 255, 0.1);
-          --danger: #ff4444;
-          --danger-glow: rgba(255, 68, 68, 0.5);
+          --glass-border-strong: rgba(255, 149, 0, 0.34);
+          --danger: #ff4d5e;
+          --danger-glow: rgba(255, 77, 94, 0.38);
           --success: #00ff88;
-          --success-glow: rgba(0, 255, 136, 0.5);
+          --success-glow: rgba(0, 255, 136, 0.42);
+        }
+
+        * {
+          box-sizing: border-box;
+        }
+
+        html,
+        body {
+          min-height: 100%;
+          background: var(--bg-deep);
+        }
+
+        button,
+        input {
+          font: inherit;
+        }
+
+        .login-shell {
+          min-height: 100vh;
+          min-height: 100svh;
+          position: relative;
+          overflow: hidden;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 32px 18px;
+          color: var(--text-primary);
+          background:
+            radial-gradient(circle at 18% 16%, rgba(255, 149, 0, 0.2), transparent 30%),
+            radial-gradient(circle at 82% 20%, rgba(255, 119, 0, 0.12), transparent 28%),
+            radial-gradient(circle at 50% 110%, rgba(255, 149, 0, 0.14), transparent 34%),
+            linear-gradient(135deg, #070912 0%, #101321 42%, #090b13 100%);
+          font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        .login-shell::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background-image:
+            linear-gradient(rgba(255, 149, 0, 0.065) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 149, 0, 0.055) 1px, transparent 1px);
+          background-size: 46px 46px;
+          mask-image: radial-gradient(circle at 50% 45%, black, transparent 78%);
+          opacity: 0.7;
+          pointer-events: none;
+        }
+
+        .login-shell::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(180deg, transparent, rgba(255, 149, 0, 0.04) 50%, transparent);
+          background-size: 100% 9px;
+          opacity: 0.36;
+          mix-blend-mode: screen;
+          pointer-events: none;
+          animation: scanline 8s linear infinite;
         }
 
         .particles {
           position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
+          inset: 0;
           pointer-events: none;
           overflow: hidden;
           z-index: 0;
@@ -324,581 +385,859 @@ export default function LoginPage() {
 
         .particle {
           position: absolute;
-          width: 4px;
-          height: 4px;
+          top: 106%;
+          width: var(--size, 3px);
+          height: var(--size, 3px);
+          border-radius: 999px;
           background: var(--accent-primary);
-          border-radius: 50%;
-          opacity: 0.3;
-          animation: float 15s infinite;
-          box-shadow: 0 0 10px var(--accent-glow);
+          opacity: 0;
+          box-shadow: 0 0 14px var(--accent-glow);
+          animation: particleFloat 16s linear infinite;
         }
 
-        @keyframes float {
-          0%, 100% {
-            transform: translateY(100vh) rotate(0deg);
-            opacity: 0;
-          }
-          10% { opacity: 0.3; }
-          90% { opacity: 0.3; }
-          100% {
-            transform: translateY(-100vh) rotate(720deg);
-            opacity: 0;
-          }
-        }
-
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-5px); }
-          75% { transform: translateX(5px); }
-        }
-
-        .btn-glow {
+        .login-stage {
+          width: min(100%, 1120px);
           position: relative;
-          overflow: hidden;
+          z-index: 1;
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) minmax(360px, 440px);
+          gap: clamp(22px, 5vw, 74px);
+          align-items: center;
         }
 
-        .btn-glow::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: -100%;
-          width: 100%;
-          height: 100%;
-          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-          transition: left 0.5s;
+        .login-copy {
+          max-width: 560px;
+          padding: 14px;
         }
 
-        .btn-glow:hover::before {
-          left: 100%;
+        .eyebrow {
+          width: fit-content;
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+          padding: 9px 14px;
+          margin-bottom: 26px;
+          border-radius: 999px;
+          background: rgba(255, 149, 0, 0.08);
+          border: 1px solid rgba(255, 149, 0, 0.24);
+          color: #ffd8a3;
+          font-size: 12px;
+          font-weight: 800;
+          letter-spacing: 1.8px;
+          text-transform: uppercase;
+          box-shadow: 0 0 36px rgba(255, 149, 0, 0.08);
         }
 
-        .register-link::after {
-          content: '';
-          position: absolute;
-          bottom: -2px;
-          left: 0;
-          width: 0;
-          height: 2px;
+        .eyebrow-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 999px;
           background: var(--accent-primary);
-          transition: width 0.3s ease;
-          box-shadow: 0 0 10px var(--accent-glow);
+          box-shadow: 0 0 18px var(--accent-glow-strong);
         }
 
-        .register-link:hover::after {
+        .hero-title {
+          margin: 0;
+          font-size: clamp(42px, 7vw, 76px);
+          line-height: 0.96;
+          letter-spacing: -3.5px;
+          font-weight: 900;
+          text-wrap: balance;
+        }
+
+        .hero-gradient {
+          display: block;
+          color: transparent;
+          background: linear-gradient(135deg, #fff9ef, #ff9500 48%, #ff6d00);
+          background-clip: text;
+          -webkit-background-clip: text;
+          text-shadow: 0 0 42px rgba(255, 149, 0, 0.22);
+        }
+
+        .hero-copy {
+          margin: 22px 0 0;
+          color: var(--text-secondary);
+          font-size: 16px;
+          line-height: 1.8;
+          max-width: 510px;
+        }
+
+        .feature-row {
+          display: grid;
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+          gap: 12px;
+          margin-top: 34px;
+        }
+
+        .feature-chip {
+          min-height: 96px;
+          padding: 16px;
+          border-radius: 18px;
+          background: linear-gradient(145deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.025));
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+          backdrop-filter: blur(18px);
+        }
+
+        .feature-chip strong {
+          display: block;
+          color: #fff4df;
+          font-size: 13px;
+          letter-spacing: 0.5px;
+          text-transform: uppercase;
+        }
+
+        .feature-chip span {
+          display: block;
+          margin-top: 8px;
+          color: var(--text-muted);
+          font-size: 12px;
+          line-height: 1.5;
+        }
+
+        .login-card {
+          position: relative;
           width: 100%;
+          overflow: hidden;
+          isolation: isolate;
+          padding: clamp(26px, 4vw, 38px);
+          border-radius: 30px;
+          background:
+            linear-gradient(145deg, rgba(255, 255, 255, 0.105), rgba(255, 255, 255, 0.026)),
+            var(--bg-card);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          backdrop-filter: blur(28px) saturate(130%);
+          box-shadow:
+            0 34px 90px rgba(0, 0, 0, 0.55),
+            0 0 0 1px rgba(255, 149, 0, 0.08),
+            inset 0 1px 0 rgba(255, 255, 255, 0.12);
+        }
+
+        .login-card::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          padding: 1px;
+          border-radius: inherit;
+          background: linear-gradient(145deg, rgba(255, 149, 0, 0.66), rgba(255, 255, 255, 0.04), rgba(255, 119, 0, 0.36));
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask-composite: exclude;
+          -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          -webkit-mask-composite: xor;
+          pointer-events: none;
+          opacity: 0.9;
+        }
+
+        .card-glow {
+          position: absolute;
+          pointer-events: none;
+          z-index: -1;
+          border-radius: 999px;
+          filter: blur(4px);
+        }
+
+        .card-glow--one {
+          width: 280px;
+          height: 280px;
+          right: -130px;
+          top: -130px;
+          background: radial-gradient(circle, rgba(255, 149, 0, 0.36), transparent 65%);
+        }
+
+        .card-glow--two {
+          width: 220px;
+          height: 220px;
+          left: -110px;
+          bottom: -120px;
+          background: radial-gradient(circle, rgba(255, 119, 0, 0.16), transparent 68%);
+        }
+
+        .corner {
+          position: absolute;
+          width: 42px;
+          height: 42px;
+          pointer-events: none;
+          opacity: 0.78;
+        }
+
+        .corner::before,
+        .corner::after {
+          content: '';
+          position: absolute;
+          background: var(--accent-primary);
+          box-shadow: 0 0 18px var(--accent-glow);
+        }
+
+        .corner::before {
+          width: 100%;
+          height: 1px;
+        }
+
+        .corner::after {
+          width: 1px;
+          height: 100%;
+        }
+
+        .corner--tl {
+          top: 18px;
+          left: 18px;
+        }
+
+        .corner--br {
+          right: 18px;
+          bottom: 18px;
+          transform: rotate(180deg);
+        }
+
+        .brand-block {
+          position: relative;
+          z-index: 1;
+          text-align: center;
+          margin-bottom: 26px;
+        }
+
+        .brand-logo {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          margin-bottom: 10px;
+          font-size: clamp(30px, 6vw, 38px);
+          font-weight: 900;
+          letter-spacing: -1.8px;
+          color: #fffaf0;
+        }
+
+        .brand-mark {
+          min-width: 43px;
+          height: 43px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 13px;
+          color: #100800;
+          background: linear-gradient(135deg, #ffb13d, #ff9500 46%, #ff6d00);
+          box-shadow:
+            0 0 28px rgba(255, 149, 0, 0.62),
+            inset 0 1px 0 rgba(255, 255, 255, 0.5);
+          transform: translateY(1px);
+        }
+
+        .brand-subtitle {
+          margin: 0;
+          color: var(--text-secondary);
+          font-size: 12px;
+          font-weight: 800;
+          letter-spacing: 2.3px;
+          text-transform: uppercase;
+        }
+
+        .mode-switch {
+          position: relative;
+          z-index: 1;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+          padding: 6px;
+          margin-bottom: 24px;
+          border-radius: 18px;
+          background: rgba(3, 6, 14, 0.54);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .mode-pill {
+          height: 42px;
+          border: 0;
+          border-radius: 13px;
+          background: transparent;
+          color: var(--text-muted);
+          cursor: pointer;
+          font-size: 12px;
+          font-weight: 900;
+          letter-spacing: 1.4px;
+          text-transform: uppercase;
+          transition: 180ms ease;
+        }
+
+        .mode-pill:hover {
+          color: #ffd7a1;
+          background: rgba(255, 149, 0, 0.08);
+        }
+
+        .mode-pill.is-active {
+          color: #140900;
+          background: linear-gradient(135deg, #ffb13d, #ff9500 48%, #ff7700);
+          box-shadow: 0 10px 28px rgba(255, 149, 0, 0.28);
+        }
+
+        .status-banner,
+        .pending-panel {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          gap: 12px;
+          align-items: flex-start;
+          margin-bottom: 18px;
+          padding: 14px 15px;
+          border-radius: 16px;
+          font-size: 13px;
+          line-height: 1.55;
+          animation: bannerIn 260ms ease both;
+          backdrop-filter: blur(16px);
+        }
+
+        .status-banner {
+          align-items: center;
+        }
+
+        .status-accent,
+        .pending-panel {
+          color: #ffd09a;
+          background: rgba(255, 149, 0, 0.1);
+          border: 1px solid rgba(255, 149, 0, 0.27);
+          box-shadow: 0 0 26px rgba(255, 149, 0, 0.07);
+        }
+
+        .status-danger {
+          color: #ff98a1;
+          background: rgba(255, 77, 94, 0.1);
+          border: 1px solid rgba(255, 77, 94, 0.34);
+          box-shadow: 0 0 26px rgba(255, 77, 94, 0.07);
+        }
+
+        .status-icon {
+          flex: 0 0 auto;
+          width: 28px;
+          height: 28px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 10px;
+          background: rgba(255, 255, 255, 0.08);
+        }
+
+        .pending-panel strong {
+          display: block;
+          margin-bottom: 2px;
+          color: #fff0d5;
+        }
+
+        .auth-form {
+          position: relative;
+          z-index: 1;
+          display: grid;
+          gap: 17px;
+          text-align: left;
+        }
+
+        .input-group {
+          display: grid;
+          gap: 9px;
+        }
+
+        .field-label {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          color: var(--text-secondary);
+          font-size: 11px;
+          font-weight: 900;
+          letter-spacing: 1.25px;
+          text-transform: uppercase;
+        }
+
+        .field-label span:last-child {
+          color: rgba(255, 149, 0, 0.84);
+          font-size: 11px;
+          font-weight: 800;
+        }
+
+        .input-shell {
+          position: relative;
+          border-radius: 16px;
+          transition: transform 180ms ease, box-shadow 180ms ease;
+        }
+
+        .input-shell:focus-within {
+          transform: translateY(-1px);
+          box-shadow: 0 0 0 4px rgba(255, 149, 0, 0.08), 0 18px 34px rgba(0, 0, 0, 0.22);
+        }
+
+        .field-icon {
+          position: absolute;
+          left: 16px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: rgba(255, 149, 0, 0.82);
+          font-size: 17px;
+          z-index: 2;
+          pointer-events: none;
+          text-shadow: 0 0 16px rgba(255, 149, 0, 0.3);
+        }
+
+        .cyber-input {
+          width: 100%;
+          height: 54px;
+          padding: 14px 16px 14px 48px;
+          border-radius: 16px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          outline: none;
+          color: var(--text-primary);
+          background:
+            linear-gradient(135deg, rgba(255, 255, 255, 0.05), transparent),
+            var(--bg-field);
+          box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+          transition: border-color 180ms ease, background 180ms ease, color 180ms ease;
+        }
+
+        .cyber-input::placeholder {
+          color: rgba(164, 172, 191, 0.42);
+        }
+
+        .cyber-input:focus {
+          border-color: rgba(255, 149, 0, 0.58);
+          background:
+            linear-gradient(135deg, rgba(255, 149, 0, 0.08), transparent),
+            rgba(3, 6, 14, 0.78);
+        }
+
+        .cyber-button {
+          position: relative;
+          width: 100%;
+          height: 56px;
+          margin-top: 6px;
+          overflow: hidden;
+          border: 0;
+          border-radius: 17px;
+          cursor: pointer;
+          color: #150900;
+          background: linear-gradient(135deg, #ffbd57, #ff9500 48%, #ff6d00);
+          box-shadow:
+            0 18px 38px rgba(255, 149, 0, 0.25),
+            inset 0 1px 0 rgba(255, 255, 255, 0.46);
+          font-weight: 950;
+          letter-spacing: 1.2px;
+          text-transform: uppercase;
+          transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+        }
+
+        .cyber-button:hover {
+          transform: translateY(-2px);
+          filter: saturate(1.1);
+          box-shadow:
+            0 24px 46px rgba(255, 149, 0, 0.34),
+            0 0 44px rgba(255, 149, 0, 0.16),
+            inset 0 1px 0 rgba(255, 255, 255, 0.52);
+        }
+
+        .cyber-button:active {
+          transform: translateY(0);
+        }
+
+        .cyber-button::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          transform: translateX(-110%);
+          background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.56), transparent);
+          transition: transform 620ms ease;
+        }
+
+        .cyber-button:hover::before {
+          transform: translateX(110%);
+        }
+
+        .button-content {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+        }
+
+        .toggle-copy {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          margin-top: 24px;
+          color: var(--text-secondary);
+          font-size: 13px;
+        }
+
+        .text-button {
+          position: relative;
+          border: 0;
+          background: none;
+          color: var(--accent-primary);
+          cursor: pointer;
+          font-weight: 900;
+          letter-spacing: 0.2px;
+          padding: 0 0 3px;
+          transition: color 180ms ease, text-shadow 180ms ease;
+        }
+
+        .text-button::after {
+          content: '';
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          height: 1px;
+          transform: scaleX(0);
+          transform-origin: left;
+          background: var(--accent-primary);
+          box-shadow: 0 0 10px var(--accent-glow);
+          transition: transform 180ms ease;
+        }
+
+        .text-button:hover {
+          color: #ffbf63;
+          text-shadow: 0 0 16px rgba(255, 149, 0, 0.45);
+        }
+
+        .text-button:hover::after {
+          transform: scaleX(1);
+        }
+
+        .security-badge {
+          position: relative;
+          z-index: 1;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 9px;
+          width: fit-content;
+          margin: 22px auto 0;
+          padding: 10px 16px;
+          border-radius: 999px;
+          color: var(--success);
+          background: rgba(0, 255, 136, 0.055);
+          border: 1px solid rgba(0, 255, 136, 0.2);
+          box-shadow: 0 0 26px rgba(0, 255, 136, 0.06);
+          font-size: 11px;
+          font-weight: 900;
+          letter-spacing: 1px;
+          text-transform: uppercase;
+        }
+
+        .security-dot {
+          width: 8px;
+          height: 8px;
+          border-radius: 999px;
+          background: var(--success);
+          box-shadow: 0 0 14px var(--success-glow);
+        }
+
+        @keyframes scanline {
+          from { transform: translateY(-20%); }
+          to { transform: translateY(20%); }
+        }
+
+        @keyframes particleFloat {
+          0% {
+            opacity: 0;
+            transform: translate3d(0, 0, 0) scale(0.7) rotate(0deg);
+          }
+          12% { opacity: 0.62; }
+          88% { opacity: 0.45; }
+          100% {
+            opacity: 0;
+            transform: translate3d(var(--drift, 0), -118vh, 0) scale(1.18) rotate(720deg);
+          }
+        }
+
+        @keyframes bannerIn {
+          from {
+            opacity: 0;
+            transform: translateY(-8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @media (max-width: 960px) {
+          .login-stage {
+            grid-template-columns: 1fr;
+            max-width: 480px;
+          }
+
+          .login-copy {
+            display: none;
+          }
+        }
+
+        @media (max-width: 520px) {
+          .login-shell {
+            align-items: flex-start;
+            padding: 18px 12px;
+          }
+
+          .login-card {
+            border-radius: 24px;
+            padding: 24px 18px;
+          }
+
+          .brand-logo {
+            font-size: 29px;
+          }
+
+          .brand-mark {
+            min-width: 38px;
+            height: 38px;
+            border-radius: 11px;
+          }
+
+          .mode-pill {
+            height: 40px;
+          }
+
+          .feature-row {
+            grid-template-columns: 1fr;
+          }
+
+          .toggle-copy {
+            flex-direction: column;
+            gap: 5px;
+          }
         }
       `}</style>
 
-      <div className="particles" id="particles"></div>
+      <div className="login-shell">
+        <div className="particles" id="particles" aria-hidden="true" />
 
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: '24px',
-        position: 'relative',
-        background: 'linear-gradient(135deg, #0a0c15 0%, #1a1d2e 50%, #0f111a 100%)',
-        fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif",
-      }}>
-        <div style={{
-          width: '100%',
-          maxWidth: '420px',
-          textAlign: 'center',
-          position: 'relative',
-          overflow: 'hidden',
-          background: 'rgba(20, 22, 35, 0.7)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid var(--glass-border)',
-          borderRadius: '20px',
-          padding: '40px',
-          boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)',
-          zIndex: 1,
-        }}>
-          <div style={{
-            position: 'absolute',
-            top: '-50%',
-            left: '-50%',
-            width: '200%',
-            height: '200%',
-            background: 'radial-gradient(circle, var(--accent-glow) 0%, transparent 70%)',
-            opacity: 0.1,
-            pointerEvents: 'none',
-          }}></div>
-
-          {/* Logo */}
-          <div style={{ marginBottom: '32px', position: 'relative', zIndex: 1 }}>
-            <div style={{
-              fontSize: '36px',
-              marginBottom: '8px',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              color: '#fff',
-              fontWeight: 700,
-            }}>
-              EzCrosshair
-              <span style={{
-                color: '#000',
-                background: 'linear-gradient(135deg, #ff9500, #ff7700)',
-                padding: '4px 12px',
-                borderRadius: '8px',
-                boxShadow: '0 0 20px rgba(255, 149, 0, 0.6), 0 0 40px rgba(255, 149, 0, 0.3)',
-                marginLeft: '4px',
-                display: 'inline-block',
-              }}>X</span>
+        <main className="login-stage">
+          <section className="login-copy" aria-hidden="true">
+            <div className="eyebrow">
+              <span className="eyebrow-dot" />
+              Secure Access Console
             </div>
-            <div style={{
-              color: 'var(--text-secondary)',
-              fontSize: '14px',
-              textTransform: 'uppercase',
-              letterSpacing: '2px',
-              marginTop: '8px',
-            }}>
-              Simple Gaming Tool
-            </div>
-          </div>
+            <h1 className="hero-title">
+              Cyber glass
+              <span className="hero-gradient">control layer.</span>
+            </h1>
+            <p className="hero-copy">
+              A sharper authentication screen for EzCrosshairX with realtime approval,
+              HWID protection, and a premium orange-on-dark visual system.
+            </p>
 
-          {/* Message */}
+            <div className="feature-row">
+              <div className="feature-chip">
+                <strong>Realtime</strong>
+                <span>Auto-continues after admin approval.</span>
+              </div>
+              <div className="feature-chip">
+                <strong>HWID Guard</strong>
+                <span>Routes users based on approval status.</span>
+              </div>
+              <div className="feature-chip">
+                <strong>Glass UI</strong>
+                <span>Polished, responsive, and production-ready.</span>
+              </div>
+            </div>
+          </section>
+
+          <section className="login-card" aria-label={isRegister ? 'Create account form' : 'Login form'}>
+            <div className="card-glow card-glow--one" />
+            <div className="card-glow card-glow--two" />
+            <span className="corner corner--tl" aria-hidden="true" />
+            <span className="corner corner--br" aria-hidden="true" />
+
+            <div className="brand-block">
+              <div className="brand-logo">
+                EzCrosshair<span className="brand-mark">X</span>
+              </div>
+              <p className="brand-subtitle">Cyber Gaming Tool</p>
+            </div>
+
+            <div className="mode-switch" role="tablist" aria-label="Authentication mode">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={!isRegister}
+                className={`mode-pill ${!isRegister ? 'is-active' : ''}`}
+                onClick={() => {
+                  setIsRegister(false)
+                  setMessage('')
+                }}
+              >
+                Login
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={isRegister}
+                className={`mode-pill ${isRegister ? 'is-active' : ''}`}
+                onClick={() => {
+                  setIsRegister(true)
+                  setMessage('')
+                }}
+              >
+                Register
+              </button>
+            </div>
+
             {message && (
-            <div style={{
-                background: message.includes('success') || message.includes('created') || message.includes('approval')
-                ? 'rgba(255, 149, 0, 0.1)'  // Orange for pending
-                : message.includes('wait')
-                ? 'rgba(255, 149, 0, 0.1)'
-                : 'rgba(255, 68, 68, 0.1)',
-                border: `1px solid ${message.includes('success') || message.includes('created') || message.includes('approval') || message.includes('wait')
-                ? 'var(--accent-primary)'  // Orange
-                : 'var(--danger)'}`,
-                color: message.includes('success') || message.includes('created') || message.includes('approval') || message.includes('wait')
-                ? 'var(--accent-primary)'
-                : 'var(--danger)',
-                padding: '12px 16px',
-                borderRadius: '10px',
-                marginBottom: '24px',
-                fontSize: '13px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                animation: 'shake 0.5s ease',
-            }}>
-                <span style={{ fontSize: '16px' }}>
-                {message.includes('success') || message.includes('created') ? '✓' : 
-                message.includes('wait') || message.includes('pending') ? '⏳' : '⚠'}
-                </span>
-                {message}
-            </div>
+              <div
+                className={`status-banner ${isPositiveMessage ? 'status-accent' : 'status-danger'}`}
+                aria-live="polite"
+              >
+                <span className="status-icon">{messageIcon}</span>
+                <span>{message}</span>
+              </div>
             )}
 
-          {pendingUser && (
-            <div style={{
-              background: 'rgba(255, 149, 0, 0.08)',
-              border: '1px solid rgba(255, 149, 0, 0.3)',
-              color: 'var(--accent-primary)',
-              padding: '14px 16px',
-              borderRadius: '10px',
-              marginBottom: '24px',
-              fontSize: '13px',
-              lineHeight: 1.6,
-              position: 'relative',
-              zIndex: 1,
-              textAlign: 'left',
-            }}>
-              <strong>Waiting for admin approval</strong>
-              <br />
-              Keep this page open. Once your account is approved, it will continue automatically.
-            </div>
-          )}
-
-          {/* LOGIN FORM */}
-          {!isRegister ? (
-            <form action={handleLogin} style={{ textAlign: 'left', position: 'relative', zIndex: 1 }}>
-              <div style={{ position: 'relative', marginBottom: '24px' }}>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '10px',
-                  color: 'var(--text-secondary)',
-                  fontSize: '12px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px',
-                  fontWeight: 600,
-                }}>
-                  <span style={{ color: 'var(--accent-primary)', fontSize: '16px' }}>›</span>
-                  Username
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <input 
-                    name="username" 
-                    type="text" 
-                    placeholder="Enter your username" 
-                    required 
-                    autoComplete="username"
-                    style={{
-                      width: '100%',
-                      padding: '14px 16px 14px 44px',
-                      fontSize: '15px',
-                      height: '52px',
-                      background: 'rgba(0, 0, 0, 0.3)',
-                      border: '1px solid var(--glass-border)',
-                      borderRadius: '10px',
-                      color: '#fff',
-                      outline: 'none',
-                      transition: 'all 0.3s ease',
-                    }}
-                  />
-                  <span style={{
-                    position: 'absolute',
-                    left: '16px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: 'var(--text-muted)',
-                    fontSize: '18px',
-                    pointerEvents: 'none',
-                  }}>👤</span>
-                </div>
+            {pendingUser && (
+              <div className="pending-panel" aria-live="polite">
+                <span className="status-icon">⏳</span>
+                <span>
+                  <strong>Waiting for admin approval</strong>
+                  Keep this page open. Once your account is approved, it will continue automatically.
+                </span>
               </div>
+            )}
 
-              <div style={{ position: 'relative', marginBottom: '24px' }}>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '10px',
-                  color: 'var(--text-secondary)',
-                  fontSize: '12px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px',
-                  fontWeight: 600,
-                }}>
-                  <span style={{ color: 'var(--accent-primary)', fontSize: '16px' }}>›</span>
-                  Password
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <input 
-                    name="password" 
-                    type="password" 
-                    placeholder="Enter your password" 
-                    required 
-                    autoComplete="current-password"
-                    style={{
-                      width: '100%',
-                      padding: '14px 16px 14px 44px',
-                      fontSize: '15px',
-                      height: '52px',
-                      background: 'rgba(0, 0, 0, 0.3)',
-                      border: '1px solid var(--glass-border)',
-                      borderRadius: '10px',
-                      color: '#fff',
-                      outline: 'none',
-                      transition: 'all 0.3s ease',
-                    }}
-                  />
-                  <span style={{
-                    position: 'absolute',
-                    left: '16px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: 'var(--text-muted)',
-                    fontSize: '18px',
-                    pointerEvents: 'none',
-                  }}>🔐</span>
+            {!isRegister ? (
+              <form action={handleLogin} className="auth-form">
+                <div className="input-group">
+                  <label className="field-label" htmlFor="login-username">
+                    <span>Username</span>
+                    <span>Required</span>
+                  </label>
+                  <div className="input-shell">
+                    <span className="field-icon" aria-hidden="true">◈</span>
+                    <input
+                      id="login-username"
+                      className="cyber-input"
+                      name="username"
+                      type="text"
+                      placeholder="Enter your username"
+                      required
+                      autoComplete="username"
+                    />
+                  </div>
                 </div>
-              </div>
 
-              <button 
-                type="submit"
-                className="btn-glow"
-                style={{
-                  width: '100%',
-                  height: '52px',
-                  fontSize: '15px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px',
-                  marginTop: '8px',
-                  background: 'linear-gradient(135deg, #ff9500, #ff7700)',
-                  border: 'none',
-                  borderRadius: '10px',
-                  color: '#fff',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)'
-                  e.currentTarget.style.boxShadow = '0 10px 30px rgba(255, 149, 0, 0.3)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.boxShadow = 'none'
+                <div className="input-group">
+                  <label className="field-label" htmlFor="login-password">
+                    <span>Password</span>
+                    <span>Secure</span>
+                  </label>
+                  <div className="input-shell">
+                    <span className="field-icon" aria-hidden="true">⌬</span>
+                    <input
+                      id="login-password"
+                      className="cyber-input"
+                      name="password"
+                      type="password"
+                      placeholder="Enter your password"
+                      required
+                      autoComplete="current-password"
+                    />
+                  </div>
+                </div>
+
+                <button type="submit" className="cyber-button">
+                  <span className="button-content">
+                    Initialize Login <span aria-hidden="true">→</span>
+                  </span>
+                </button>
+              </form>
+            ) : (
+              <form action={handleRegister} className="auth-form">
+                <div className="input-group">
+                  <label className="field-label" htmlFor="register-username">
+                    <span>Username</span>
+                    <span>3–32 chars</span>
+                  </label>
+                  <div className="input-shell">
+                    <span className="field-icon" aria-hidden="true">◈</span>
+                    <input
+                      id="register-username"
+                      className="cyber-input"
+                      name="username"
+                      type="text"
+                      placeholder="Choose a username"
+                      required
+                      minLength={3}
+                      maxLength={32}
+                      autoComplete="username"
+                    />
+                  </div>
+                </div>
+
+                <div className="input-group">
+                  <label className="field-label" htmlFor="register-password">
+                    <span>Password</span>
+                    <span>Min 6</span>
+                  </label>
+                  <div className="input-shell">
+                    <span className="field-icon" aria-hidden="true">⌬</span>
+                    <input
+                      id="register-password"
+                      className="cyber-input"
+                      name="password"
+                      type="password"
+                      placeholder="Create a password"
+                      required
+                      minLength={6}
+                      autoComplete="new-password"
+                    />
+                  </div>
+                </div>
+
+                <div className="input-group">
+                  <label className="field-label" htmlFor="register-password-confirm">
+                    <span>Confirm Password</span>
+                    <span>Match</span>
+                  </label>
+                  <div className="input-shell">
+                    <span className="field-icon" aria-hidden="true">↻</span>
+                    <input
+                      id="register-password-confirm"
+                      className="cyber-input"
+                      name="passwordConfirm"
+                      type="password"
+                      placeholder="Repeat your password"
+                      required
+                      autoComplete="new-password"
+                    />
+                  </div>
+                </div>
+
+                <button type="submit" className="cyber-button">
+                  <span className="button-content">
+                    Create Account <span aria-hidden="true">→</span>
+                  </span>
+                </button>
+              </form>
+            )}
+
+            <div className="toggle-copy">
+              <span>{isRegister ? 'Already have an account?' : "Don't have an account?"}</span>
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => {
+                  setIsRegister(!isRegister)
+                  setMessage('')
                 }}
               >
-                <span>Initialize Login</span>
-                <span style={{ marginLeft: '8px' }}>→</span>
+                {isRegister ? 'Sign in instead' : 'Create one'}
               </button>
-            </form>
-          ) : (
-            /* REGISTER FORM */
-            <form action={handleRegister} style={{ textAlign: 'left', position: 'relative', zIndex: 1 }}>
-              <div style={{ position: 'relative', marginBottom: '24px' }}>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '10px',
-                  color: 'var(--text-secondary)',
-                  fontSize: '12px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px',
-                  fontWeight: 600,
-                }}>
-                  <span style={{ color: 'var(--accent-primary)', fontSize: '16px' }}>›</span>
-                  Username
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <input 
-                    name="username" 
-                    type="text" 
-                    placeholder="Choose a username" 
-                    required 
-                    minLength={3}
-                    maxLength={32}
-                    autoComplete="username"
-                    style={{
-                      width: '100%',
-                      padding: '14px 16px 14px 44px',
-                      fontSize: '15px',
-                      height: '52px',
-                      background: 'rgba(0, 0, 0, 0.3)',
-                      border: '1px solid var(--glass-border)',
-                      borderRadius: '10px',
-                      color: '#fff',
-                      outline: 'none',
-                      transition: 'all 0.3s ease',
-                    }}
-                  />
-                  <span style={{
-                    position: 'absolute',
-                    left: '16px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: 'var(--text-muted)',
-                    fontSize: '18px',
-                    pointerEvents: 'none',
-                  }}>👤</span>
-                </div>
-              </div>
-
-              <div style={{ position: 'relative', marginBottom: '24px' }}>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '10px',
-                  color: 'var(--text-secondary)',
-                  fontSize: '12px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px',
-                  fontWeight: 600,
-                }}>
-                  <span style={{ color: 'var(--accent-primary)', fontSize: '16px' }}>›</span>
-                  Password
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <input 
-                    name="password" 
-                    type="password" 
-                    placeholder="Create a password" 
-                    required 
-                    minLength={6}
-                    autoComplete="new-password"
-                    style={{
-                      width: '100%',
-                      padding: '14px 16px 14px 44px',
-                      fontSize: '15px',
-                      height: '52px',
-                      background: 'rgba(0, 0, 0, 0.3)',
-                      border: '1px solid var(--glass-border)',
-                      borderRadius: '10px',
-                      color: '#fff',
-                      outline: 'none',
-                      transition: 'all 0.3s ease',
-                    }}
-                  />
-                  <span style={{
-                    position: 'absolute',
-                    left: '16px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: 'var(--text-muted)',
-                    fontSize: '18px',
-                    pointerEvents: 'none',
-                  }}>🔐</span>
-                </div>
-              </div>
-
-              <div style={{ position: 'relative', marginBottom: '24px' }}>
-                <label style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  marginBottom: '10px',
-                  color: 'var(--text-secondary)',
-                  fontSize: '12px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px',
-                  fontWeight: 600,
-                }}>
-                  <span style={{ color: 'var(--accent-primary)', fontSize: '16px' }}>›</span>
-                  Confirm Password
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <input 
-                    name="passwordConfirm" 
-                    type="password" 
-                    placeholder="Repeat your password" 
-                    required 
-                    autoComplete="new-password"
-                    style={{
-                      width: '100%',
-                      padding: '14px 16px 14px 44px',
-                      fontSize: '15px',
-                      height: '52px',
-                      background: 'rgba(0, 0, 0, 0.3)',
-                      border: '1px solid var(--glass-border)',
-                      borderRadius: '10px',
-                      color: '#fff',
-                      outline: 'none',
-                      transition: 'all 0.3s ease',
-                    }}
-                  />
-                  <span style={{
-                    position: 'absolute',
-                    left: '16px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: 'var(--text-muted)',
-                    fontSize: '18px',
-                    pointerEvents: 'none',
-                  }}>🔁</span>
-                </div>
-              </div>
-
-              <button 
-                type="submit"
-                className="btn-glow"
-                style={{
-                  width: '100%',
-                  height: '52px',
-                  fontSize: '15px',
-                  textTransform: 'uppercase',
-                  letterSpacing: '1px',
-                  marginTop: '8px',
-                  background: 'linear-gradient(135deg, #ff9500, #ff7700)',
-                  border: 'none',
-                  borderRadius: '10px',
-                  color: '#fff',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)'
-                  e.currentTarget.style.boxShadow = '0 10px 30px rgba(255, 149, 0, 0.3)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.boxShadow = 'none'
-                }}
-              >
-                <span>Create Account</span>
-                <span style={{ marginLeft: '8px' }}>→</span>
-              </button>
-            </form>
-          )}
-
-          {/* Divider */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            margin: '28px 0',
-            color: 'var(--text-muted)',
-            fontSize: '12px',
-            textTransform: 'uppercase',
-            letterSpacing: '1px',
-          }}>
-            <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, transparent, var(--glass-border), transparent)' }}></div>
-            <span style={{ padding: '0 16px' }}>or</span>
-            <div style={{ flex: 1, height: '1px', background: 'linear-gradient(90deg, transparent, var(--glass-border), transparent)' }}></div>
-          </div>
-
-          {/* Toggle */}
-          <div style={{ textAlign: 'center', paddingTop: '8px' }}>
-            <div style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '12px' }}>
-              {isRegister ? 'Already have an account?' : "Don't have an account?"}
             </div>
-            <button
-              onClick={() => {
-                setIsRegister(!isRegister)
-                setMessage('')
-              }}
-              className="register-link"
-              style={{
-                color: 'var(--accent-primary)',
-                textDecoration: 'none',
-                fontWeight: 600,
-                fontSize: '14px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px',
-                transition: 'all 0.3s ease',
-                position: 'relative',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.color = '#ffbb33'
-                e.currentTarget.style.textShadow = '0 0 10px var(--accent-glow)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.color = 'var(--accent-primary)'
-                e.currentTarget.style.textShadow = 'none'
-              }}
-            >
-              <span>{isRegister ? 'Sign in' : 'Create one'}</span>
-              <span>↗</span>
-            </button>
-          </div>
 
-          {/* Security Badge */}
-          <div style={{ textAlign: 'center' }}>
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              marginTop: '24px',
-              padding: '10px 18px',
-              background: 'rgba(0, 255, 136, 0.05)',
-              border: '1px solid rgba(0, 255, 136, 0.2)',
-              borderRadius: '20px',
-              fontSize: '12px',
-              color: 'var(--success)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-            }}>
-              <span>🔒</span>
-              Encrypted Connection
+            <div className="security-badge">
+              <span className="security-dot" />
+              Protected Auth Flow
             </div>
-          </div>
-        </div>
+          </section>
+        </main>
       </div>
     </>
   )
