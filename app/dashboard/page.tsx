@@ -1122,6 +1122,58 @@ export default function DashboardPage() {
     setTimeout(() => setManagementMessage(''), 3000)
   }
 
+
+  async function handleCopySelectedHwidFormat() {
+    if (selectedUserIds.length === 0) return
+
+    const selectedUsersWithHwid = manageableUsers
+      .filter(u => selectedUserIds.includes(u.id))
+      .map(u => ({
+        hwid: u.hwid?.trim() || '',
+        username: u.username || '',
+      }))
+      .filter(u => u.hwid)
+
+    if (selectedUsersWithHwid.length === 0) {
+      setManagementMessage('No selected users with HWID to format.')
+      setTimeout(() => setManagementMessage(''), 3000)
+      return
+    }
+
+    const formattedText = selectedUsersWithHwid
+      .map(u => `${u.hwid}{ panic = off, jumpscare = off, username = ${u.username} }`)
+      .join('\n')
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(formattedText)
+      } else {
+        const textarea = document.createElement('textarea')
+        textarea.value = formattedText
+        textarea.style.position = 'fixed'
+        textarea.style.left = '-9999px'
+        textarea.style.top = '0'
+        document.body.appendChild(textarea)
+        textarea.focus()
+        textarea.select()
+        document.execCommand('copy')
+        textarea.remove()
+      }
+
+      const skippedCount = selectedUserIds.length - selectedUsersWithHwid.length
+      setManagementMessage(
+        skippedCount > 0
+          ? `Copied HWID format for ${selectedUsersWithHwid.length} user(s). Skipped ${skippedCount} without HWID.`
+          : `Copied HWID format for ${selectedUsersWithHwid.length} user(s)!`
+      )
+    } catch (err) {
+      console.error('Failed to copy HWID format:', err)
+      setManagementMessage('Failed to copy HWID format.')
+    }
+
+    setTimeout(() => setManagementMessage(''), 3000)
+  }
+
   async function handleSaveExpiration() {
     if (!editingGroupId) return
     setBulkProcessing(true)
@@ -2830,6 +2882,23 @@ export default function DashboardPage() {
                     }}
                   >
                     Delete Selected
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCopySelectedHwidFormat}
+                    disabled={bulkProcessing || selectedUserIds.length === 0}
+                    style={{
+                      padding: '8px 12px',
+                      background: 'rgba(255, 149, 0, 0.12)',
+                      color: '#ff9500',
+                      border: '1px solid rgba(255, 149, 0, 0.35)',
+                      borderRadius: '8px',
+                      cursor: bulkProcessing || selectedUserIds.length === 0 ? 'not-allowed' : 'pointer',
+                      fontSize: '12px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    HWID Format
                   </button>
                 </div>
               </div>
