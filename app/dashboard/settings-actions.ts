@@ -175,17 +175,15 @@ function normalizePastebinSettingsRow(data: unknown): PastebinSettings | null {
 export async function getPastebinSettings(): Promise<PastebinSettingsResult> {
   const supabase = await createServerSupabase()
 
-  const { data, error } = await supabase
-    .from('pastebinlist')
-    .select('pastebinoff, pastebinon, updated_at')
-    .eq('id', 1)
-    .maybeSingle()
+  // Preferred path: use SECURITY DEFINER RPC so RLS cannot hide the settings row.
+  // Run fix-pastebinlist-rpc.sql once in Supabase SQL editor.
+  const { data, error } = await supabase.rpc('get_pastebin_settings')
 
   if (error) {
     if (error.message.includes('does not exist')) {
       return {
         data: null,
-        error: 'The pastebinlist table does not exist. Run create-pastebinlist-table.sql in Supabase SQL editor first.',
+        error: 'The pastebinlist table/RPC does not exist. Run fix-pastebinlist-rpc.sql in Supabase SQL editor first.',
       }
     }
 
@@ -217,51 +215,24 @@ export async function savePastebinSettings(
   }
 
   const supabase = await createServerSupabase()
-  const now = new Date().toISOString()
-  const columnName = mode === 'on' ? 'pastebinon' : 'pastebinoff'
 
-  const { data: existingRow, error: lookupError } = await supabase
-    .from('pastebinlist')
-    .select('id')
-    .eq('id', 1)
-    .maybeSingle()
+  // Do not insert/update pastebinlist directly here. RLS can block server actions.
+  // The RPC is SECURITY DEFINER and updates only row id=1.
+  // Run fix-pastebinlist-rpc.sql once in Supabase SQL editor.
+  const { error } = await supabase.rpc('update_pastebin_settings', {
+    p_mode: mode,
+    p_pastebin_text: pastebinText,
+  })
 
-  if (lookupError) {
-    if (lookupError.message.includes('does not exist')) {
+  if (error) {
+    if (error.message.includes('does not exist') || error.message.includes('Could not find the function')) {
       return {
         data: null,
-        error: 'The pastebinlist table does not exist. Run create-pastebinlist-table.sql in Supabase SQL editor first.',
+        error: 'Pastebin RPC is missing. Run fix-pastebinlist-rpc.sql in Supabase SQL editor first.',
       }
     }
 
-    return { data: null, error: `Database lookup error: ${lookupError.message}` }
-  }
-
-  if (existingRow) {
-    const { error: updateError } = await supabase
-      .from('pastebinlist')
-      .update({
-        [columnName]: pastebinText,
-        updated_at: now,
-      })
-      .eq('id', 1)
-
-    if (updateError) {
-      return { data: null, error: `Database update error: ${updateError.message}` }
-    }
-  } else {
-    const { error: insertError } = await supabase
-      .from('pastebinlist')
-      .insert({
-        id: 1,
-        pastebinoff: mode === 'off' ? pastebinText : DEFAULT_PASTEBIN_OFF_TEXT,
-        pastebinon: mode === 'on' ? pastebinText : DEFAULT_PASTEBIN_ON_TEXT,
-        updated_at: now,
-      })
-
-    if (insertError) {
-      return { data: null, error: `Database insert error: ${insertError.message}` }
-    }
+    return { data: null, error: `Database RPC error: ${error.message}` }
   }
 
   return getPastebinSettings()
