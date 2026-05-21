@@ -1805,7 +1805,7 @@ export default function DashboardPage() {
                   textTransform: 'uppercase',
                   marginBottom: '8px',
                 }}>
-                  New Update Available • {launchData?.updated_at ? formatDateTime(launchData.updated_at) : 'Update time unavailable'}
+                  CHANGELOGS • {launchData?.updated_at ? formatDateTime(launchData.updated_at) : 'Update time unavailable'}
                 </div>
 
                 <div style={{
