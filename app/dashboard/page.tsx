@@ -51,6 +51,10 @@ interface FileRecord {
   created_at: string
 }
 
+type UsersSortKey = 'username' | 'role' | 'status' | 'created_at' | 'last_login_at' | 'last_launch_at'
+type SortDirection = 'asc' | 'desc'
+
+
 function formatBytes(bytes: number) {
   if (bytes === 0) return '0 B'
   const k = 1024
@@ -175,6 +179,7 @@ export default function DashboardPage() {
   const [bulkRole, setBulkRole] = useState('user')
   const [bulkGroupId, setBulkGroupId] = useState('not set')
   const [bulkProcessing, setBulkProcessing] = useState(false)
+  const [usersSort, setUsersSort] = useState<{ key: UsersSortKey; direction: SortDirection } | null>(null)
 
   // Expiration Editor State
   const [isExpModalOpen, setIsExpModalOpen] = useState(false)
@@ -1391,7 +1396,73 @@ export default function DashboardPage() {
       })
   }, [users, onlineUserIdSet])
 
-  const usersTabUsers = sortedActiveUsers
+  function getDefaultUsersSortDirection(key: UsersSortKey): SortDirection {
+    return key === 'status' || key === 'created_at' || key === 'last_login_at' || key === 'last_launch_at'
+      ? 'desc'
+      : 'asc'
+  }
+
+  function handleUsersSort(key: UsersSortKey) {
+    setUsersSort(prev => {
+      if (prev?.key === key) {
+        return {
+          key,
+          direction: prev.direction === 'asc' ? 'desc' : 'asc',
+        }
+      }
+
+      return {
+        key,
+        direction: getDefaultUsersSortDirection(key),
+      }
+    })
+  }
+
+  function getUserDateMs(value?: string | null) {
+    if (!value) return null
+
+    const timestamp = new Date(value).getTime()
+    return Number.isNaN(timestamp) ? null : timestamp
+  }
+
+  const usersTabUsers = useMemo(() => {
+    if (!usersSort) return sortedActiveUsers
+
+    const directionMultiplier = usersSort.direction === 'asc' ? 1 : -1
+    const baseOrder = new Map(sortedActiveUsers.map((sortedUser, index) => [sortedUser.id, index]))
+
+    return [...sortedActiveUsers].sort((a, b) => {
+      let result = 0
+
+      if (usersSort.key === 'username') {
+        result = a.username.localeCompare(b.username, undefined, { sensitivity: 'base' })
+      } else if (usersSort.key === 'role') {
+        result = a.role.localeCompare(b.role, undefined, { sensitivity: 'base' })
+      } else if (usersSort.key === 'status') {
+        const aOnline = onlineUserIdSet.has(a.id) ? 1 : 0
+        const bOnline = onlineUserIdSet.has(b.id) ? 1 : 0
+        result = aOnline - bOnline
+      } else {
+        const aTime = getUserDateMs(a[usersSort.key])
+        const bTime = getUserDateMs(b[usersSort.key])
+
+        if (aTime === null && bTime === null) {
+          result = 0
+        } else if (aTime === null) {
+          return 1
+        } else if (bTime === null) {
+          return -1
+        } else {
+          result = aTime - bTime
+        }
+      }
+
+      if (result !== 0) return result * directionMultiplier
+
+      return (baseOrder.get(a.id) ?? 0) - (baseOrder.get(b.id) ?? 0)
+    })
+  }, [sortedActiveUsers, usersSort, onlineUserIdSet])
+
   const manageableUsers = sortedActiveUsers
   const sortedGroupExpirations = useMemo(
     () => [...groupExpirations].sort((a, b) => a.group_id.localeCompare(b.group_id)),
@@ -1409,6 +1480,43 @@ export default function DashboardPage() {
       .filter(u => u.role !== 'pending')
       .sort((a, b) => a.username.localeCompare(b.username))
   }, [users, currentUserRow?.group_id, user?.group_id])
+
+  const renderUsersSortHeader = (label: string, key: UsersSortKey) => {
+    const isActive = usersSort?.key === key
+    const directionIcon = usersSort?.direction === 'asc' ? '↑' : '↓'
+
+    return (
+      <button
+        type="button"
+        onClick={() => handleUsersSort(key)}
+        aria-label={`Sort users by ${label} ${isActive && usersSort?.direction === 'asc' ? 'descending' : 'ascending'}`}
+        style={{
+          width: 'fit-content',
+          padding: 0,
+          background: 'transparent',
+          border: 'none',
+          color: isActive ? '#ff9500' : 'inherit',
+          cursor: 'pointer',
+          font: 'inherit',
+          textTransform: 'inherit',
+          letterSpacing: 'inherit',
+          fontWeight: 'inherit',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
+        }}
+      >
+        <span>{label}</span>
+        <span style={{
+          color: isActive ? '#ff9500' : '#5a6072',
+          fontSize: '11px',
+          lineHeight: 1,
+        }}>
+          {isActive ? directionIcon : '↕'}
+        </span>
+      </button>
+    )
+  }
 
   const renderOnlineStatus = (userId: number) => {
     const isOnline = isUserOnline(userId)
@@ -2005,12 +2113,12 @@ export default function DashboardPage() {
                   letterSpacing: '1px',
                   fontWeight: 600,
                 }}>
-                  <div>Username</div>
-                  <div>Role</div>
-                  <div>Status</div>
-                  <div>Registered</div>
-                  <div>Last login</div>
-                  <div>Last launch</div>
+                  <div>{renderUsersSortHeader('Username', 'username')}</div>
+                  <div>{renderUsersSortHeader('Role', 'role')}</div>
+                  <div>{renderUsersSortHeader('Status', 'status')}</div>
+                  <div>{renderUsersSortHeader('Registered', 'created_at')}</div>
+                  <div>{renderUsersSortHeader('Last login', 'last_login_at')}</div>
+                  <div>{renderUsersSortHeader('Last launch', 'last_launch_at')}</div>
                 </div>
 
                 {usersTabUsers.map(u => (
