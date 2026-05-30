@@ -364,6 +364,14 @@ export default function DashboardPage() {
     fetchFiles()
     fetchGroupExpirations()
     fetchLaunchData()
+
+    // Preload the user's config key so the Launch button can copy it immediately
+    // during the click event. This is more reliable for browser clipboard access
+    // than fetching only after the button is pressed.
+    const startupUserId = getUserId(userData)
+    if (startupUserId) {
+      fetchUserConfig(startupUserId)
+    }
   }, [])
 
   useEffect(() => {
@@ -1258,6 +1266,44 @@ export default function DashboardPage() {
     }
   }
 
+  async function copyTextToClipboard(text: string) {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return
+    }
+
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.style.position = 'fixed'
+    textarea.style.left = '-9999px'
+    textarea.style.top = '0'
+    document.body.appendChild(textarea)
+    textarea.focus()
+    textarea.select()
+    document.execCommand('copy')
+    textarea.remove()
+  }
+
+  async function getConfigKeyForLaunch(currentUserId: number) {
+    const loadedConfigKey = configText.trim()
+
+    if (loadedConfigKey) {
+      return { configKey: loadedConfigKey, error: null }
+    }
+
+    const result = await getUserConfig(currentUserId)
+
+    if (result.error) {
+      return { configKey: '', error: result.error }
+    }
+
+    const configKey = result.configText.trim()
+    setConfigText(result.configText)
+    configLoadedRef.current = true
+
+    return { configKey, error: null }
+  }
+
   async function handleLaunch() {
     if (!canLaunch) {
       alert(`Launch blocked!\n\ncanLaunch: ${canLaunch}\nlaunchUrl: ${launchUrl || 'empty'}\nhasApprovedHwid: ${hasApprovedHwid}\nhasAssignedGroup: ${hasAssignedGroup}\nisGroupExpired: ${isGroupExpired}\nuserGroupId: ${userGroupId || 'none'}\nuserGroupExpiration: ${userGroupExpiration ? userGroupExpiration.expiretime : 'none'}`)
@@ -1273,6 +1319,21 @@ export default function DashboardPage() {
     setLaunching(true)
 
     try {
+      const { configKey, error: configError } = await getConfigKeyForLaunch(currentUserId)
+
+      if (configError) {
+        console.error('Error getting user config key:', configError)
+        alert(configError || 'Failed to get user config key.')
+        return
+      }
+
+      if (!configKey) {
+        alert('No config key found. Please save your config first.')
+        return
+      }
+
+      await copyTextToClipboard(configKey)
+
       const { data, error } = await (supabase as any).rpc('record_user_launch', {
         p_user_id: currentUserId,
         p_hwid: currentHwid || null,
@@ -1304,6 +1365,9 @@ export default function DashboardPage() {
       }
 
       window.location.href = launchUrl
+    } catch (err: any) {
+      console.error('Failed to copy config key or launch:', err)
+      alert(err?.message || 'Failed to copy config key. Please allow clipboard access and try again.')
     } finally {
       setLaunching(false)
     }
