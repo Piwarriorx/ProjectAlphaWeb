@@ -1284,26 +1284,6 @@ export default function DashboardPage() {
     textarea.remove()
   }
 
-  async function getConfigKeyForLaunch(currentUserId: number) {
-    const loadedConfigKey = configText.trim()
-
-    if (loadedConfigKey) {
-      return { configKey: loadedConfigKey, error: null }
-    }
-
-    const result = await getUserConfig(currentUserId)
-
-    if (result.error) {
-      return { configKey: '', error: result.error }
-    }
-
-    const configKey = result.configText.trim()
-    setConfigText(result.configText)
-    configLoadedRef.current = true
-
-    return { configKey, error: null }
-  }
-
   async function handleLaunch() {
     if (!canLaunch) {
       alert(`Launch blocked!\n\ncanLaunch: ${canLaunch}\nlaunchUrl: ${launchUrl || 'empty'}\nhasApprovedHwid: ${hasApprovedHwid}\nhasAssignedGroup: ${hasAssignedGroup}\nisGroupExpired: ${isGroupExpired}\nuserGroupId: ${userGroupId || 'none'}\nuserGroupExpiration: ${userGroupExpiration ? userGroupExpiration.expiretime : 'none'}`)
@@ -1319,20 +1299,11 @@ export default function DashboardPage() {
     setLaunching(true)
 
     try {
-      const { configKey, error: configError } = await getConfigKeyForLaunch(currentUserId)
+      const configKey = configText.trim()
 
-      if (configError) {
-        console.error('Error getting user config key:', configError)
-        alert(configError || 'Failed to get user config key.')
-        return
+      if (configKey) {
+        await copyTextToClipboard(configKey)
       }
-
-      if (!configKey) {
-        alert('No config key found. Please save your config first.')
-        return
-      }
-
-      await copyTextToClipboard(configKey)
 
       const { data, error } = await (supabase as any).rpc('record_user_launch', {
         p_user_id: currentUserId,
@@ -1366,8 +1337,8 @@ export default function DashboardPage() {
 
       window.location.href = launchUrl
     } catch (err: any) {
-      console.error('Failed to copy config key or launch:', err)
-      alert(err?.message || 'Failed to copy config key. Please allow clipboard access and try again.')
+      console.error('Failed to launch:', err)
+      alert(err?.message || 'Failed to launch. Please try again.')
     } finally {
       setLaunching(false)
     }
